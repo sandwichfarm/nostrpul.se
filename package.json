@@ -1,0 +1,25 @@
+{
+  "name": "66viewer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "d3": "^7.8.5",
+    "isotope": "^1.0.0-alpha.3",
+    "isotope-layout": "^3.0.6",
+    "lodash": "^4.17.21",
+    "masonry-layout": "^4.2.2",
+    "nostr-tools": "^2.1.5",
+    "svelte": "^4.2.8"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^3.0.1",
+    "svelte": "^4.2.8",
+    "vite": "^5.0.8"
+  }
+}
