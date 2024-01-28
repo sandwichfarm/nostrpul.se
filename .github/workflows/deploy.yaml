@@ -2,7 +2,7 @@ name: Build & Deploy Demo
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Publish"]
+
     branches: [main]
     types: 
       - completed
@@ -35,7 +35,7 @@ jobs:
         run: |
           tar \
             --dereference --hard-dereference \
-            --directory "dist" \
+            --directory "_site/dist" \
             -cvf "$RUNNER_TEMP/artifact.tar" \
             .
         env:
