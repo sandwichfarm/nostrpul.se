@@ -1,4 +1,4 @@
-name: Build & Depoy Demo
+name: Build & Deploy Demo
 on:
   workflow_dispatch:
   workflow_run:
@@ -28,11 +28,6 @@ jobs:
 
       - name: Build Package
         run: yarn build
-
-      - name: Hash docs
-        id: hash
-        run: |
-          echo "dist=${{hashFiles('dist')}}" >> "$GITHUB_OUTPUT"
       
       - name: Setup Pages
         uses: actions/configure-pages@v3
