@@ -29,6 +29,17 @@ jobs:
 
       - name: Build Package
         run: yarn build
+    
+      - name: Archive artifact
+        shell: sh
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory "dist" \
+            -cvf "$RUNNER_TEMP/artifact.tar" \
+            .
+        env:
+          INPUT_PATH: ${{ inputs.path }}
       
       - name: Setup Pages
         uses: actions/configure-pages@v3
@@ -37,7 +48,9 @@ jobs:
         uses: actions/upload-pages-artifact@v2
         with:
           name: 'github-pages'
-          path: './dist'
+          retention-days: 1
+          path: '${{ runner.temp }}/artifact.tar'
+          if-no-files-found: error
 
   deploy:
     runs-on: ubuntu-latest
