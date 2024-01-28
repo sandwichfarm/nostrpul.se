@@ -29,7 +29,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
     if (firstEoseReceived && !masonry) {
       initializeMasonry();
     } else if (masonry) {
-      masonry.reloadItems();
+        masonry.reloadItems();
       masonry.layout();
     }
   });
@@ -42,9 +42,8 @@ import { onMount, afterUpdate, tick } from 'svelte';
     });
   }
 
-  onMount(async () => {
+  const connect = async () => {
     const relay = await Relay.connect('wss://history.nostr.watch');
-
     relay.subscribe(
       [
         {
@@ -54,11 +53,11 @@ import { onMount, afterUpdate, tick } from 'svelte';
         }
       ],
       {
-        onevent(event) {
+        onevent(event) {  
           const processedEvent = processEvent(event);
+          since = event.created_at
           if (processedEvent) {
             events.update(currentEvents => {
-              // Add new event and filter out duplicates
               return [processedEvent, ...currentEvents].filter((v, i, a) => a.findIndex(t => (t.dTag === v.dTag)) === i);
             });
           }
@@ -68,6 +67,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
         },
         onclose() {
           console.log('Subscription closed');
+          connect()
         },
         oneose() {
           console.log('EOSE')
@@ -76,29 +76,20 @@ import { onMount, afterUpdate, tick } from 'svelte';
         }
       }
     );
+  }
 
-    // return () => {
-    //   relay.close();
-    // };
+  onMount(async () => {
+    connect()
+
+    return () => {
+      relay.close();
+    };
   });
 
    function processBatch() {
     if (!firstEoseReceived) firstEoseReceived = true;  
     events.update(currentEvents => [...currentEvents]);
   }
-
-  // afterUpdate(() => {
-  //   if (masonry) {
-  //     masonry.reloadItems();
-  //     masonry.layout();
-  //   } else {
-  //     masonry = new Masonry('.main', {
-  //       itemSelector: '.event',
-  //       percentPosition: true,
-  //       horizontalOrder: true
-  //     });
-  //   }
-  // });
 
   function calculateDimensions(event) {
     // Default dimension and RTT scaling factor
@@ -166,7 +157,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
   <main class="main section">
     {#each $events as event (event.id)}
       <div class="event" style={`height: ${event.dimension}px; background-color: ${event.backgroundColor};`} in:fade>
-        <!-- Event content here -->
+        <span style="display:none">{JSON.stringify(event, null, 4)}</span>
       </div>
     {/each}
   </main>
