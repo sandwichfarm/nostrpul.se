@@ -9,7 +9,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
   let loading = true;
   let masonry;
   let firstEoseReceived = false;
-  let since = Math.round(Date.now() / 1000) - 60 * 60
+  let since = Math.round(Date.now() / 1000) - (60 * 60 * 2)
 
   function processEvent(event) {
     const dTag = event.tags.find(tag => tag[0] === 'd');
@@ -48,7 +48,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
       [
         {
           kinds: [30066],
-          authors: ['151c17c9d234320cf0f189af7b761f63419fd6c38c6041587a008b7682e4640f'],
+          authors: ['cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974'],
           since
         }
       ],
@@ -78,7 +78,7 @@ import { onMount, afterUpdate, tick } from 'svelte';
     );
   }
 
-  onMount(async () => {
+  onMount(() => {
     connect()
 
     return () => {
@@ -154,9 +154,15 @@ import { onMount, afterUpdate, tick } from 'svelte';
 </script>
 
 {#if firstEoseReceived}
+  
   <main class="main section">
+    <div id="stats">
+      <small>relays:</small> <br />
+      {$events.length} online
+    </div>
     {#each $events as event (event.id)}
       <div class="event" style={`height: ${event.dimension}px; background-color: ${event.backgroundColor};`} in:fade>
+        {event.tags.filter(tag => tag[0] === 'rtt' && tag[1] === 'open')[0][2]}
         <span style="display:none">{JSON.stringify(event, null, 4)}</span>
       </div>
     {/each}
@@ -198,5 +204,14 @@ import { onMount, afterUpdate, tick } from 'svelte';
   #loading { 
     font-size:50em;
     color:rgba(0,0,0,0.05)
+  }
+
+  #stats {
+    font-size:10em;
+    position:absolute;
+    top:100px;
+    left:0px; 
+    display:block;
+    color:rgba(0,0,0,0.5);
   }
 </style>
