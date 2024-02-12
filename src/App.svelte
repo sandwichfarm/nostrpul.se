@@ -172,9 +172,10 @@
 
 function parse30066(event) {
     const parsedTags = {};
-    const url = event.tags.filter( tag => tag[0] == 'd')[0][1]
-    event.tags = event.tags.filter( tag => tag.length >= 3)
-    event.tags.forEach(tag => {
+    const url = event.tags.filter( tag => tag[0] == 'd')?.[0]?.[1]
+    if(!url) return { error: "no d tag?" }
+    const tags = event.tags.filter( tag => tag.length >= 3)
+    tags.forEach(tag => {
         const [key, subkey, ...values] = tag;
         if (!parsedTags[key]) {
             parsedTags[key] = {};
@@ -191,6 +192,7 @@ function parse30066(event) {
             }
         }
     });
+    if(!parsedTags?.rtt?.open) return { error: "no rtt connect tag?", tags: tags }
     return { url, ...parsedTags};
 }
 function castValue(value) {
