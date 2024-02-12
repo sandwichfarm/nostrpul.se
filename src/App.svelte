@@ -195,17 +195,31 @@ function parse30066(event) {
     if(!parsedTags?.rtt?.open) return { error: "no rtt connect tag?", tags: tags }
     return { url, ...parsedTags};
 }
+
 function castValue(value) {
-    if (value.toLowerCase() === 'true')
-        return true;
-    if (value.toLowerCase() === 'false')
-        return false;
+    // Check for boolean strings
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+    
+    // Check for IPv4 addresses or similar patterns that should not be converted
+    const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (ipv4Regex.test(value)) return value;
+
+    // Additional check for geohash-like patterns (alphanumeric strings)
+    // This regex matches strings that contain both letters and numbers, indicative of a geohash
+    const geohashRegex = /^[0-9a-zA-Z]+$/;
+    if (geohashRegex.test(value) && /[a-zA-Z]/.test(value) && /[0-9]/.test(value)) return value;
+
+    // Attempt to parse as a float
     const asFloat = parseFloat(value);
-    if (!isNaN(asFloat) && isFinite(asFloat)) {
+    if (!isNaN(asFloat) && isFinite(asFloat) && String(asFloat) === value) {
         return asFloat;
     }
+
+    // Return the original value if none of the above conditions are met
     return value;
 }
+
 
 
 
@@ -254,6 +268,7 @@ function castValue(value) {
         {#if currentModal === ev.id}
           <Modal showModal={true} on:close={hideModal}>
             <pre>{JSON.stringify(parse30066(ev), null, 4)}</pre>
+            <!-- <pre>{JSON.stringify(ev, null, 4)}</pre> -->
           </Modal>
         {/if}
       {/each}
