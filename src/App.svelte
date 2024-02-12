@@ -57,6 +57,56 @@
     });
   }
 
+  function parse30066(event) {
+    const parsedTags = {};
+    const url = event.tags.filter( tag => tag[0] == 'd')?.[0]?.[1]
+    if(!url) return { error: "no d tag?" }
+    const tags = event.tags.filter( tag => tag.length >= 3)
+    tags.forEach(tag => {
+        const [key, subkey, ...values] = tag;
+        if (!parsedTags[key]) {
+            parsedTags[key] = {};
+        }
+        if (!parsedTags[key][subkey]) {
+            parsedTags[key][subkey] = values.length > 1 ? values.map(v => castValue(v)) : castValue(values[0]);
+        }
+        else {
+            if (Array.isArray(parsedTags[key][subkey])) {
+                parsedTags[key][subkey] = [...parsedTags[key][subkey], ...values.map(v => castValue(v))];
+            }
+            else {
+                parsedTags[key][subkey] = [parsedTags[key][subkey], ...values.map(v => castValue(v))];
+            }
+        }
+    });
+    if(!parsedTags?.rtt?.open) return { error: "no rtt connect tag?", tags: tags }
+    return { url, ...parsedTags};
+  }
+
+  function castValue(value) {
+      // Check for boolean strings
+      if (value.toLowerCase() === 'true') return true;
+      if (value.toLowerCase() === 'false') return false;
+      
+      // Check for IPv4 addresses or similar patterns that should not be converted
+      const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+      if (ipv4Regex.test(value)) return value;
+
+      // Additional check for geohash-like patterns (alphanumeric strings)
+      // This regex matches strings that contain both letters and numbers, indicative of a geohash
+      const geohashRegex = /^[0-9a-zA-Z]+$/;
+      if (geohashRegex.test(value) && /[a-zA-Z]/.test(value) && /[0-9]/.test(value)) return value;
+
+      // Attempt to parse as a float
+      const asFloat = parseFloat(value);
+      if (!isNaN(asFloat) && isFinite(asFloat) && String(asFloat) === value) {
+          return asFloat;
+      }
+
+      // Return the original value if none of the above conditions are met
+      return value;
+  }
+
   const connect = async () => {
     const relay = await Relay.connect('wss://history.nostr.watch').catch(connect);
     relay.subscribe(
@@ -111,18 +161,42 @@
 
   function calculateDimensions(event) {
     // Default dimension and RTT scaling factor
-    const defaultDimension = 50; // Base size of the block
+    const defaultDimension = 150; // Base size of the block
     const rttScalingFactor = 0.05; // Determines how much RTT affects the size
+
+    // Max RTT value for scaling
+    const maxRTT = 10000; // Example max value, adjust based on expected RTT range
 
     // Check if the event has RTT data
     if (event.tags && Array.isArray(event.tags)) {
-      const rttValues = event.tags.filter(tag => tag[0] === 'rtt').map(tag => parseInt(tag[2], 10));
-      const totalRTT = rttValues.reduce((acc, rtt) => acc + rtt, 0);
-      return defaultDimension + (totalRTT * rttScalingFactor);
+        const rttValues = event.tags.filter(tag => tag[0] === 'rtt').map(tag => parseInt(tag[2], 10));
+        const totalRTT = rttValues.reduce((acc, rtt) => acc + rtt, 0);
+        
+        // Calculate the scaled dimension inversely related to RTT
+        // Ensure that the totalRTT does not exceed maxRTT for calculation purposes
+        const effectiveRTT = Math.min(totalRTT, maxRTT);
+        
+        // Adjust the dimension based on RTT, making higher RTT result in smaller dimensions
+        return defaultDimension - Math.min(effectiveRTT * rttScalingFactor, defaultDimension - 1);
     } else {
-      return defaultDimension;
+        return defaultDimension;
     }
-  }
+}
+
+  // function calculateDimensions(event) {
+  //   // Default dimension and RTT scaling factor
+  //   const defaultDimension = 50; // Base size of the block
+  //   const rttScalingFactor = 0.05; // Determines how much RTT affects the size
+
+  //   // Check if the event has RTT data
+  //   if (event.tags && Array.isArray(event.tags)) {
+  //     const rttValues = event.tags.filter(tag => tag[0] === 'rtt').map(tag => parseInt(tag[2], 10));
+  //     const totalRTT = rttValues.reduce((acc, rtt) => acc + rtt, 0);
+  //     return defaultDimension + (totalRTT * rttScalingFactor);
+  //   } else {
+  //     return defaultDimension;
+  //   }
+  // }
 
   function generateSaturatedColorFromTag(str) {
     let hash = 0;
@@ -170,55 +244,7 @@
     return color;
 }
 
-function parse30066(event) {
-    const parsedTags = {};
-    const url = event.tags.filter( tag => tag[0] == 'd')?.[0]?.[1]
-    if(!url) return { error: "no d tag?" }
-    const tags = event.tags.filter( tag => tag.length >= 3)
-    tags.forEach(tag => {
-        const [key, subkey, ...values] = tag;
-        if (!parsedTags[key]) {
-            parsedTags[key] = {};
-        }
-        if (!parsedTags[key][subkey]) {
-            parsedTags[key][subkey] = values.length > 1 ? values.map(v => castValue(v)) : castValue(values[0]);
-        }
-        else {
-            if (Array.isArray(parsedTags[key][subkey])) {
-                parsedTags[key][subkey] = [...parsedTags[key][subkey], ...values.map(v => castValue(v))];
-            }
-            else {
-                parsedTags[key][subkey] = [parsedTags[key][subkey], ...values.map(v => castValue(v))];
-            }
-        }
-    });
-    if(!parsedTags?.rtt?.open) return { error: "no rtt connect tag?", tags: tags }
-    return { url, ...parsedTags};
-}
 
-function castValue(value) {
-    // Check for boolean strings
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
-    
-    // Check for IPv4 addresses or similar patterns that should not be converted
-    const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-    if (ipv4Regex.test(value)) return value;
-
-    // Additional check for geohash-like patterns (alphanumeric strings)
-    // This regex matches strings that contain both letters and numbers, indicative of a geohash
-    const geohashRegex = /^[0-9a-zA-Z]+$/;
-    if (geohashRegex.test(value) && /[a-zA-Z]/.test(value) && /[0-9]/.test(value)) return value;
-
-    // Attempt to parse as a float
-    const asFloat = parseFloat(value);
-    if (!isNaN(asFloat) && isFinite(asFloat) && String(asFloat) === value) {
-        return asFloat;
-    }
-
-    // Return the original value if none of the above conditions are met
-    return value;
-}
 
 
 
