@@ -15,6 +15,12 @@
 
   import Masonry from "masonry-layout";
 
+  import { Sound } from "svelte-sound";
+  import tone_file from "./assets/tone.mp3";
+
+  const tone = new Sound(tone_file);
+
+
   import { generateBackground } from "./utils";
 
   const MONITOR =
@@ -100,6 +106,7 @@
     }
     if (!initialSyncComplete) return;
     processBatch();
+    if(!isMuted) tone.play()
     // console.log(event.id)
   };
 
@@ -291,6 +298,7 @@
   function processBatch() {
     if (!initialSyncComplete) initialSyncComplete = true;
     k30066.update((currentk30066) => [...currentk30066]);
+    
   }
 
   function calculateDimensions(event) {
@@ -366,6 +374,14 @@
     return rtt ? `${letter}:${rtt}ms` : "";
   }
 
+  let isMuted = true; // Initial state of the sound, assuming it starts muted
+
+  // Function to toggle the muted state
+  function toggleMute() {
+    isMuted = !isMuted;
+    // Here, you can also add logic to actually control the audio
+  }
+
   window.addEventListener("resize", () => {
     if (masonry) {
       masonry.layout();
@@ -374,6 +390,9 @@
 </script>
 
 {#if initialSyncComplete}
+  <button on:click={toggleMute} class="mute">
+    {isMuted ? '🔇' : '🔈'}
+  </button>
   <div id="header">
     <span class="sitetitle">nostrpul.se</span>
     <span class="credit">by nostr.watch</span>
@@ -665,6 +684,18 @@
     font-size: clamp(6rem, 12vw, 25em); /* Responsive font size */
   }
 
+  .mute {
+    display:inline;
+    background:none;
+    border:none;
+    position:absolute;
+    top:10px;
+    left:50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    font-size:3em;
+  }
+
   @media (max-width: 600px) {
     #stats {
       flex-direction: column;
@@ -720,6 +751,10 @@
       cursor: pointer;
       display: inline-block;
       font-weight: bolder;
+    }
+
+    .mute {
+      display:none;
     }
   }
 </style>
