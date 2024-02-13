@@ -71,7 +71,6 @@ class ComplementaryToneGenerator {
 
     const nextNote = this.currentScale[this.scaleIndex];
 
-    console.log(nextNote, this.currentRootNoteIndex, this.currentRootNoteIndex)
     this.synth.triggerAttackRelease(nextNote, '8n');
   }
 
