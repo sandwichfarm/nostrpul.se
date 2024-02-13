@@ -31,6 +31,7 @@
   let since = Math.round(Date.now() / 1000) - (60 * 60 * 1.1)
 
   $: if ($activeTab) {
+    event30166.set(null)
     const ev = get30166($activeTab)
       .then(ev => {
         event30166.set(ev);
