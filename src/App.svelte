@@ -10,8 +10,8 @@
   import Modal from "./Modal.svelte";
 
   import { NostrFetcher } from "nostr-fetch"
-  import { Relay, SimplePool } from "nostr-tools";
-  import { simplePoolAdapter } from "@nostr-fetch/adapter-nostr-tools";
+  import { Relay } from "nostr-tools";
+  // import { simplePoolAdapter } from "@nostr-fetch/adapter-nostr-tools";
 
   import Masonry from "masonry-layout";
 
@@ -104,8 +104,7 @@
   };
 
   async function initialSync() {
-    RelayPool = new SimplePool();
-    const fetcher = NostrFetcher.withCustomPool(simplePoolAdapter(RelayPool));
+    const fetcher = NostrFetcher.init()
     const iter = fetcher.allEventsIterator(
       ["wss://history.nostr.watch"],
       {
@@ -116,7 +115,6 @@
       { skipVerification: true, sort: true },
     );
     for await (const ev of iter) {
-      console.log(ev.id);
       on_event_handler(ev);
     }
     // initialSyncComplete=true
@@ -282,7 +280,7 @@
   }
 
   onMount(async () => {
-    // await initialSync();
+    await initialSync();
     await continuousSync();
 
     return () => {
