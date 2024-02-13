@@ -17,7 +17,7 @@
     "nostr-fetch": "^0.15.0",
     "nostr-tools": "2.1.5",
     "svelte": "^4.2.8",
-    "svelte-sound": "^0.6.0"
+    "tone": "^14.7.77"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.1",

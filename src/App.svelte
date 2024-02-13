@@ -1,25 +1,21 @@
 <script>
   document.title = "nostrpul.se";
 
-  // import "websocket-polyfill";
-
   import { onMount, afterUpdate, tick } from "svelte";
   import { fade } from "svelte/transition";
   import { writable } from "svelte/store";
 
   import Modal from "./Modal.svelte";
 
-  import { NostrFetcher } from "nostr-fetch"
+  import * as Tone from "tone";
+  import ToneGenerator from "./tone";
+
+  import { NostrFetcher } from "nostr-fetch";
   import { Relay } from "nostr-tools";
-  // import { simplePoolAdapter } from "@nostr-fetch/adapter-nostr-tools";
 
   import Masonry from "masonry-layout";
 
-  import { Sound } from "svelte-sound";
-  import tone_file from "./assets/tone.mp3";
-
-  const tone = new Sound(tone_file);
-
+  let toneGenerator;
 
   import { generateBackground } from "./utils";
 
@@ -37,12 +33,16 @@
   const loading30166 = writable(false);
   const event30166 = writable(null);
   let activeTab = writable(0); // Currently selected tab index
-  let focusRelay = writable(null)
+  let focusRelay = writable(null);
 
   let loading = true;
   let masonry;
   let initialSyncComplete = false;
   let since = Math.round(Date.now() / 1000) - 60 * 60 * 1.1;
+
+  const newEvents = [];
+  
+  let eventRunner
 
   $: if ($activeTab) {
     event30166.set(null);
@@ -57,9 +57,9 @@
   // let currentRelayModal = null;
 
   function hideModals() {
-    activeTab.set(0)
-    focusRelay.set(null)
-    event30166.set(null)
+    activeTab.set(0);
+    focusRelay.set(null);
+    event30166.set(null);
     hideGenericModal();
     hideRelayModal();
   }
@@ -73,7 +73,7 @@
   }
 
   function showRelayModal(ev) {
-    focusRelay.set(getUrlFromEvent(ev))
+    focusRelay.set(getUrlFromEvent(ev));
     currentRelayModal = ev.id;
   }
 
@@ -93,10 +93,7 @@
     };
   }
 
-  const on_event_handler = (event) => {
-    if (initialSyncComplete && event.created_at < since) return;
-    const processedEvent = processEvent(event);
-    since = event.created_at;
+  const updateEvents = (processedEvent) => {
     if (processedEvent) {
       k30066.update((currentk30066) => {
         return [processedEvent, ...currentk30066].filter(
@@ -104,14 +101,32 @@
         );
       });
     }
-    if (!initialSyncComplete) return;
+  };
+
+  const queueEvent = (event) => {
+    newEvents.push(event);
+  };
+
+  const populateNextEvent = () => {
+    if(!newEvents.length) return
+    const event = newEvents.shift()
+    updateEvents(event);
     processBatch();
-    if(!isMuted) tone.play()
-    // console.log(event.id)
+    if (!isMuted) toneGenerator.playNextNote();
+  };
+
+  const on_event_handler = (event) => {
+    if (initialSyncComplete && event.created_at < since) return;
+    const processedEvent = processEvent(event);
+    since = event.created_at;
+    if (!initialSyncComplete) 
+      updateEvents(processedEvent);
+    else 
+      queueEvent(processedEvent);
   };
 
   async function initialSync() {
-    const fetcher = NostrFetcher.init()
+    const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
       ["wss://history.nostr.watch"],
       {
@@ -130,7 +145,9 @@
   }
 
   const continuousSync = async () => {
-    RelaySocket = await Relay.connect("wss://history.nostr.watch").catch(continuousSync);
+    RelaySocket = await Relay.connect("wss://history.nostr.watch").catch(
+      continuousSync,
+    );
     RelaySocket.subscribe(
       [
         {
@@ -159,7 +176,7 @@
   };
 
   async function get30166(relay) {
-    console.log(`getting 30166 for ${relay.url}`)
+    console.log(`getting 30166 for ${relay.url}`);
     return new Promise(async (resolve) => {
       RelaySocket = await Relay.connect("wss://history.nostr.watch").catch(
         console.error,
@@ -167,7 +184,7 @@
       RelaySocket.subscribe(
         [
           {
-            "#d": [relay], 
+            "#d": [relay],
             limit: 1,
             kinds: [30166],
             authors: [MONITOR],
@@ -219,13 +236,13 @@
     return ev;
   }
 
-  function getUrlFromEvent(event){
+  function getUrlFromEvent(event) {
     return event.tags.filter((tag) => tag[0] == "d")?.[0]?.[1];
   }
 
   function parse30066(event) {
     const parsedTags = {};
-    const url = getUrlFromEvent(event)
+    const url = getUrlFromEvent(event);
     if (!url) return { error: "no d tag?" };
     const tags = event.tags.filter((tag) => tag.length >= 3);
     tags.forEach((tag) => {
@@ -288,9 +305,10 @@
 
   onMount(async () => {
     await initialSync();
+    eventRunner = setInterval( populateNextEvent, 500 )
     await continuousSync();
-
     return () => {
+      clearInterval(eventRunner)
       RelaySocket.close();
     };
   });
@@ -298,7 +316,6 @@
   function processBatch() {
     if (!initialSyncComplete) initialSyncComplete = true;
     k30066.update((currentk30066) => [...currentk30066]);
-    
   }
 
   function calculateDimensions(event) {
@@ -377,9 +394,12 @@
   let isMuted = true; // Initial state of the sound, assuming it starts muted
 
   // Function to toggle the muted state
-  function toggleMute() {
+  async function toggleMute() {
     isMuted = !isMuted;
-    // Here, you can also add logic to actually control the audio
+    if (isMuted) return;
+    if (Tone.context.state !== "running") await Tone.start();
+    else Tone.Transport.cancel();
+    if (!toneGenerator) toneGenerator = new ToneGenerator();
   }
 
   window.addEventListener("resize", () => {
@@ -390,8 +410,13 @@
 </script>
 
 {#if initialSyncComplete}
-  <button on:click={toggleMute} class="mute">
-    {isMuted ? '🔇' : '🔈'}
+  <button
+    on:click={() => {
+      toggleMute();
+    }}
+    class="mute"
+  >
+    {isMuted ? "🔇" : "🔈"}
   </button>
   <div id="header">
     <span class="sitetitle">nostrpul.se</span>
@@ -442,7 +467,9 @@
           on:click={() => showRelayModal(ev)}
           role="button"
           tabindex="0"
-          on:keydown={(event) => { event.key === "Enter" && showRelayModal(ev) } }
+          on:keydown={(event) => {
+            event.key === "Enter" && showRelayModal(ev);
+          }}
         >
           <span class="rtt">{rttDisplay("open", ev)}</span>
           <span class="rtt">{rttDisplay("read", ev)}</span>
@@ -685,15 +712,27 @@
   }
 
   .mute {
-    display:inline;
-    background:none;
-    border:none;
-    position:absolute;
-    top:10px;
-    left:50%;
+    display: inline;
+    background: none;
+    border: none;
+    position: absolute;
+    top: 10px;
+    left: 50%;
     transform: translateX(-50%);
     z-index: 100;
-    font-size:3em;
+    font-size: 3em;
+  }
+
+  .test {
+    display: inline;
+    background: none;
+    border: none;
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    font-size: 3em;
   }
 
   @media (max-width: 600px) {
@@ -754,7 +793,7 @@
     }
 
     .mute {
-      display:none;
+      display: none;
     }
   }
 </style>
