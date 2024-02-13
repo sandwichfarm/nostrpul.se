@@ -164,7 +164,7 @@
         onclose() {
           const reconnect = 2000;
           console.log(`Subscription closed, reconnecting in ${reconnect}`);
-          setTimeout(connect, reconnect);
+          setTimeout(continuousSync, reconnect);
         },
         oneose() {
           console.log("EOSE");
