@@ -85,4 +85,15 @@
   :global(.main::-webkit-scrollbar-thumb) {
     color: #fff
   }
+
+  @media (max-width: 600px) {
+    dialog {
+      max-width: 32em;
+      border-radius: 0.2em;
+      border: none;
+      padding: 0;
+      color:black;
+      background: rgba(255,255,255, 0.9);
+    }
+  }
 </style>

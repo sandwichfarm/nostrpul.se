@@ -304,6 +304,7 @@
 {#if firstEoseReceived}
   <div id="header">
     <span class="sitetitle">nostrpul.se</span> 
+    <span class="credit">by nostr.watch</span>
     <!-- <a class="info" 
       href="#"
       on:click={() => { showGenericModal("info");} }
@@ -463,6 +464,12 @@ button.active{
   color:rgba(0,0,0,0.3);
 }
 
+#header .credit {
+  color:rgba(0,0,0,0.2);
+  font-size: clamp(2rem, 1vw, 2em);
+}
+
+
 #header .byline {
   color:rgba(0,0,0,0.1);
   float:right;
@@ -555,6 +562,55 @@ button.active{
   #stats .metric {
     width: 100%;
     margin-bottom: 20px;
+  }
+
+  #header {
+    position:relative;
+    top:0px;
+    left:0px;
+    right:0px;
+    font-size: clamp(2rem, 2vw, 2em);
+    z-index:10;
+    padding:10px 50px;
+    z-index:0;
+    
+  }
+
+  #header .sitetitle {
+    position: fixed;
+    top:0px;
+    transform: translateX(-50%);
+    left:50%;
+    color:rgba(0,0,0,0.3);
+  }
+
+  #header .credit {
+    position: fixed;
+    top:40px;
+    transform: translateX(-50%);
+    left:50%;
+    color:rgba(0,0,0,0.2);
+    font-size: clamp(1rem, 1vw, 2em);
+  }
+
+
+  #header .byline {
+    color:rgba(0,0,0,0.1);
+    float:none;
+    position: fixed;
+    bottom:0px;
+    left:0px;
+    right:0px;
+    display:block;
+    width:100%;
+    text-align:center;
+  }
+
+  #header .info {
+    color:rgba(0,0,0,0.3);
+    cursor:pointer;
+    display:inline-block;
+    font-weight:bolder
   }
 }
 </style>
