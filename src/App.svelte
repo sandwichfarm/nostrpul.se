@@ -21,6 +21,7 @@
 
   const MONITOR =
     "cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974";
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 2.1;
 
   let currentRelayModal = null;
   let currentGenericModal = null;
@@ -38,7 +39,7 @@
   let loading = true;
   let masonry;
   let initialSyncComplete = false;
-  let since = Math.round(Date.now() / 1000) - 60 * 60 * 1.1;
+  let since = ONLINE_THRESHOLD
 
   const newEvents = [];
   
@@ -96,9 +97,11 @@
   const updateEvents = (processedEvent) => {
     if (processedEvent) {
       k30066.update((currentk30066) => {
-        return [processedEvent, ...currentk30066].filter(
-          (v, i, a) => a.findIndex((t) => t.dTag === v.dTag) === i,
-        );
+        return [processedEvent, ...currentk30066]
+          .filter(
+            (v, i, a) => a.findIndex((t) => t.dTag === v.dTag) === i,
+          )
+          .filter( ev => ev.created_at > Math.round(Date.now()/1000)-ONLINE_THRESHOLD )
       });
     }
   };
@@ -305,7 +308,7 @@
 
   onMount(async () => {
     await initialSync();
-    eventRunner = setInterval( populateNextEvent, 500 )
+    eventRunner = setInterval( populateNextEvent, 250 )
     await continuousSync();
     return () => {
       clearInterval(eventRunner)
