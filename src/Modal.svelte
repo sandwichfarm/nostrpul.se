@@ -1,5 +1,6 @@
 <script>
   export let showModal;
+  export let ev;
   let dialog;
 
   $: if (dialog) {
@@ -15,26 +16,30 @@
   tabindex="0" 
   on:keydown={(event) => event.key === 'Enter' &&  dialog.close()}>
   <div on:click|stopPropagation>
-    <slot name="header" />
-    <hr />
+    {#if ev}
+    <div id="modal-header" style="background-color: {ev? ev?.backgroundColor: ''}">
+      <slot name="header" />
+    </div>
+    {/if}
     <slot />
-    <hr />
-    <button autofocus on:click={() => dialog.close()}>Close Modal</button>
+    <button autofocus on:click={() => showModal = false}>Close Modal</button>
   </div>
 </dialog>
 
 <style>
 	dialog {
-		max-width: 32em;
+		max-width: 64em;
 		border-radius: 0.2em;
 		border: none;
 		padding: 0;
+    color:black;
+    background: rgba(255,255,255, 0.9);
 	}
 	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.3);
+		background: rgba(255,255,255, 0.66);
 	}
 	dialog > div {
-		padding: 1em;
+		padding: 0;
 	}
 	dialog[open] {
 		animation: zoom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -61,4 +66,23 @@
 	button {
 		display: block;
 	}
+
+  #modal-header {
+    display:block;
+    padding:1em;
+    font-size:clamp(1.2rem, 1.5vw, 2em);
+    overflow:hidden;
+  }
+
+  :global(.main::-webkit-scrollbar) {
+    width: 0.25rem
+  }
+
+  :global(.main::-webkit-scrollbar-track) {
+    background: #fff;
+  }
+
+  :global(.main::-webkit-scrollbar-thumb) {
+    color: #fff
+  }
 </style>

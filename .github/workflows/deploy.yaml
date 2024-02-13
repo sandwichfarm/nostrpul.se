@@ -1,46 +1,46 @@
-name: Build & Deploy Demo
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+# name: Build & Deploy Demo
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [main]
 
-jobs:
+# jobs:
 
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v3
+#   build:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: read
+#       pages: write
+#       id-token: write
+#     steps:
+#       - uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '20'
+#           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install Dependencies
-        run: yarn install
+#       - name: Install Dependencies
+#         run: yarn install
 
-      - name: Build Package
-        run: yarn build
+#       - name: Build Package
+#         run: yarn build
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          name: 'github-pages'
-          path: 'dist'
+#       - name: Upload artifact
+#         uses: actions/upload-pages-artifact@v3
+#         with:
+#           name: 'github-pages'
+#           path: 'dist'
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+#   deploy:
+#     runs-on: ubuntu-latest
+#     needs: build
+#     permissions:
+#       contents: read
+#       pages: write
+#       id-token: write
+#     steps:
+#       - name: Deploy to GitHub Pages
+#         id: deployment
+#         uses: actions/deploy-pages@v4

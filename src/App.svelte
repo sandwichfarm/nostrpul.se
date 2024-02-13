@@ -1,29 +1,65 @@
 <script>
-  
+  document.title = "nostrpul.se";
   
   import { onMount, afterUpdate, tick } from 'svelte';
   import Modal from './Modal.svelte';
+  // import Tabs from './components/tabs/Tabs.svelte';
   import { Relay } from 'nostr-tools';
   import { fade } from 'svelte/transition';
   import Masonry from 'masonry-layout';  
   import { writable } from 'svelte/store';
 
-  let currentModal = null;
+  import {generateBackground} from './utils'
 
-  const events = writable([]);
+  const MONITOR = 'cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974'
+
+  let currentRelayModal = null;
+  let currentGenericModal = null;
+
+  let RelaySocket
+
+  const k30066 = writable([]);
+  const k30166 = writable([]);
+  const loading30166 = writable(false)
+  const event30166 = writable(null)
+  let activeTab = writable(0); // Currently selected tab index
+
+
   let loading = true;
   let masonry;
   let firstEoseReceived = false;
   let since = Math.round(Date.now() / 1000) - (60 * 60 * 1.1)
 
-  // let currentModal = null; 
-
-  function showModal(id) {
-    currentModal = id;
+  $: if ($activeTab) {
+    const ev = get30166($activeTab)
+      .then(ev => {
+        event30166.set(ev);
+        loading30166.set(false);
+      })
+      .catch(console.error)
   }
 
-  function hideModal() {
-    currentModal = null;
+  // let currentRelayModal = null; 
+
+  function hideModals(){
+    hideGenericModal()
+    hideRelayModal()
+  }
+
+  function showGenericModal(id) {
+    currentGenericModal = id;
+  }
+
+  function hideGenericModal() {
+    currentGenericModal = null;
+  }
+
+  function showRelayModal(id) {
+    currentRelayModal = id;
+  }
+
+  function hideRelayModal() {
+    currentRelayModal = null;
   }
 
   function processEvent(event) {
@@ -38,7 +74,28 @@
     };
   }
 
-  events.subscribe(async ($events) => {
+  async function get30166(relay){
+    return new Promise( async (resolve) => {
+      RelaySocket = await Relay.connect('wss://history.nostr.watch').catch(connect);
+      RelaySocket.subscribe(
+        [
+          {
+            limit: 1,
+            kinds: [30166],
+            authors: [MONITOR],
+            since: Math.round(Date.now()/1000)-(60*60*2)
+          }
+        ],
+        {
+          onevent(event) {  
+            resolve(event)
+          },
+        }
+      );
+    })
+  }
+
+  k30066.subscribe(async ($k30066) => {
     await tick(); // Wait for DOM updates
 
     if (firstEoseReceived && !masonry) {
@@ -50,11 +107,21 @@
   });
 
   function initializeMasonry() {
-    masonry = new Masonry('#events', {
+    masonry = new Masonry('#k30066', {
       itemSelector: '.event',
       percentPosition: true,
       horizontalOrder: true
     });
+  }
+
+  function removeExtraFieldsFromEvent(event){
+    const ev = {}
+    const keys = ['sig', 'pubkey', 'id', 'created_at', 'content', 'tags', 'kind']
+    for(const key in event){
+      console.log(key)
+      if(keys.includes(key)) ev[key] = event[key]
+    }
+    return ev
   }
 
   function parse30066(event) {
@@ -108,13 +175,13 @@
   }
 
   const connect = async () => {
-    const relay = await Relay.connect('wss://history.nostr.watch').catch(connect);
-    relay.subscribe(
+    RelaySocket = await Relay.connect('wss://history.nostr.watch').catch(connect);
+    RelaySocket.subscribe(
       [
         {
           limit: 1000,
           kinds: [30066],
-          authors: ['cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974'],
+          authors: [MONITOR],
           since
         }
       ],
@@ -124,8 +191,8 @@
           const processedEvent = processEvent(event);
           since = event.created_at
           if (processedEvent) {
-            events.update(currentEvents => {
-              return [processedEvent, ...currentEvents].filter((v, i, a) => a.findIndex(t => (t.dTag === v.dTag)) === i);
+            k30066.update(currentk30066 => {
+              return [processedEvent, ...currentk30066].filter((v, i, a) => a.findIndex(t => (t.dTag === v.dTag)) === i);
             });
           }
           if(!firstEoseReceived) return 
@@ -150,13 +217,13 @@
     await connect()
 
     return () => {
-      relay.close();
+      RelaySocket.close();
     };
   });
 
    function processBatch() {
     if (!firstEoseReceived) firstEoseReceived = true;  
-    events.update(currentEvents => [...currentEvents]);
+    k30066.update(currentk30066 => [...currentk30066]);
   }
 
   function calculateDimensions(event) {
@@ -226,34 +293,6 @@
   }
 
 
-  function generateColorFromTag(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash &= hash; // Convert to 32bit integer
-    }
-
-    let color = '#';
-    for (let i = 0; i < 3; i++) {
-        let value = (hash >> (i * 8)) & 255;
-        // Normalize the value to get a pastel color
-        value = (value % 128) + 127; // Ensure the color is always light
-        color += ('00' + value.toString(16)).substr(-2);
-    }
-    return color;
-}
-
-
-
-
-
-
-  function generateBackground(event) {
-    const dTag = event.tags.find(tag => tag[0] === 'd');
-    return dTag ? generateColorFromTag(dTag[1]) : '#defaultColor';
-  }
-
   window.addEventListener('resize', () => {
     if (masonry) {
       masonry.layout();
@@ -262,124 +301,259 @@
 </script>
 
 {#if firstEoseReceived}
+  <div id="header">
+    <span class="sitetitle">nostrpul.se</span> 
+    <!-- <a class="info" 
+      href="#"
+      on:click={() => { showGenericModal("info");} }
+      role="button" 
+      tabindex="0" 
+      on:keydown={(event) => event.key === 'Enter' && showGenericModal(ev.id)}>
+        ⓘ
+    </a>  -->
+    <span class="byline"><em><strong>nostr is the api</strong></em></span>
+  </div>
   <div id="stats">
     <div id="online" class="metric">
+      <span class="value">{$k30066.length}</span>
       <span class="key">online</span>
-      <span class="value">{$events.length}</span>
     </div>
     <div id="readable" class="metric">
+      <span class="value">{$k30066.filter(event => event.tags.filter( tag => tag[0] === 'rtt' && tag[1] === 'read').length > 0 ).length}</span>
       <span class="key">readable</span>
-      <span class="value">{$events.filter(event => event.tags.filter( tag => tag[0] === 'rtt' && tag[1] === 'read').length > 0 ).length}</span>
     </div>
     <div id="writable" class="metric">
+      <span class="value">{$k30066.filter(event => event.tags.filter( tag => tag[0] === 'rtt' && tag[1] === 'write').length > 0 ).length}</span>
       <span class="key">writable</span>
-      <span class="value">{$events.filter(event => event.tags.filter( tag => tag[0] === 'rtt' && tag[1] === 'write').length > 0 ).length}</span>
     </div>
   </div>
   <main class="main section">
-    <div id="events">
-      
-      {#each $events as ev (ev.id)}
+    <div id="k30066">
+      {#each $k30066 as ev, index (ev.id)}
         <div class="event" 
             style={`height: ${ev.dimension}px; background-color: ${ev.backgroundColor};`} 
             in:fade 
-            on:click={() => showModal(ev.id)} 
+            on:click={() => showRelayModal(ev.id)} 
             role="button" 
             tabindex="0" 
-            on:keydown={(event) => event.key === 'Enter' && showModal(ev.id)}>
+            on:keydown={(event) => event.key === 'Enter' && showRelayModal(ev.id)}>
           <span class="rtt">{rttDisplay('open', ev)}</span>
           <span class="rtt">{rttDisplay('read', ev)}</span>
           <span class="rtt">{rttDisplay('write', ev)}</span>
         </div>
-        {#if currentModal === ev.id}
-          <Modal showModal={true} on:close={hideModal}>
-            <pre>{JSON.stringify(parse30066(ev), null, 4)}</pre>
+        {#if currentRelayModal === ev.id}
+          <Modal showModal={true} on:close={hideModals} ev={ev}>
+            <span slot="header" >{parse30066(ev)?.url}</span>
+            <div class="tabs">
+              <button on:click={() => $activeTab = 0} style="background-color: {ev.backgroundColor}" class="{$activeTab === 0 ? 'active' : ''}">
+                PARSED 30066
+              </button>
+              <button on:click={() => $activeTab = 1} style="background-color: {ev.backgroundColor}" class="{$activeTab === 1 ? 'active' : ''}">
+                RAW 30066
+              </button>
+              <button on:click={() => { $activeTab = 2 } } style="background-color: {ev.backgroundColor}" class="{$activeTab === 2 ? 'active' : ''}">
+                RAW 30166
+              </button>
+            </div>
+            <div class="tab-contents">
+              {#if $activeTab === 0 && currentRelayModal === ev.id}
+              <div class="tab-content">
+                <pre>{JSON.stringify(parse30066(ev), null, 4)}</pre>
+              </div>
+              {/if}
+              {#if $activeTab === 1 && currentRelayModal === ev.id}
+              <div class="tab-content">
+                <pre>{JSON.stringify(removeExtraFieldsFromEvent(ev), null, 4)}</pre>
+              </div>
+              {/if}
+              {#if $activeTab === 2 && currentRelayModal === ev.id}
+              <div class="tab-content">
+                {#if $loading30166}
+                  <p>Loading 30166 event...</p>
+                {:else}
+                  {#if $event30166}
+                    <!-- Render your eventData here -->
+                    <pre>{JSON.stringify($event30166, null, 4)}</pre>
+                  {:else}
+                    <p>Non 30166 event for this relay. (try again?)</p>
+                  {/if}
+                {/if}
+              </div>
+              {/if}
+              <p>
+                
+              </p>
+              <pre></pre>
+            </div>
+            
             <!-- <pre>{JSON.stringify(ev, null, 4)}</pre> -->
           </Modal>
         {/if}
       {/each}
     </div>
   </main>
+  
+  {#if currentGenericModal === "info"}
+    <Modal showModal={true} on:close={hideModals}>
+      <div class="pontification">
+      <p>
+      nostrpul.se is a demonstration of <a href="https://github.com/nostr-protocol/nips/pull/230" target="_new">NIP-66</a> events, 
+      built to increase awareness of <strong>protocol-level relay meta-data and discoverability.</strong> 
+      </p>
+      <p>
+      With the advent of nostr, proprietary, centralized APIs are a relic of a bygone era, only clinged onto by those who wish to control the future. 
+      It was obvious to me that relay data should be protocol level, as the proprietary, centralized control over this data could lead to centralization 
+      and censorship. By having the network data free and accessible over nostr, that can be provided by any number of monitors, we can cross-reference data to identify 
+      dark patterns, instead of allowing those dark patterns to go unnoticed, served over proprietary APIs. 
+      </p>
+      <p>
+      I've spent the better part of a year analyzing, understanding and reporting on nostr relays. Contrary to the belief of some cats, 
+      relays <strong>are not just generalized data-warehouses.</strong> Just like your favorite nostr client, for better or worse, relays can be whatever 
+      the fuck you want them to be
+      </p>
+      </div>
+    </Modal>
+  {/if}
 {:else}
   <div id="loading">loading</div>
 {/if}
 
 <style>
-  body, html, :root { 
-    background-color:white; 
-    margin:0;
-    padding:0;
-  }
-  .main.section {
-    position: fixed !important; /* Ensure it's fixed to the viewport */
-    top: 0px;
-    left: 0px;
-    right: 0px;
-    bottom: 0px;
-    overflow: hidden;  /* Prevent scrollbars within this section */
-    z-index: 1;  /* Ensure it's above other content */
-  }
 
-  .event {
-    width: 2.5%;
-    margin: 0;
-    padding: 0;
-    break-inside: avoid;
-    opacity: 0.5;
-    transition: opacity 10s ease;
-  }
+body, html, :root { 
+  background-color:white; 
+  margin:0;
+  padding:0;
+  color-scheme: light;
+}
 
-  .event:hover {
-    opacity: 1;
-    transition: opacity 0.3s ease-out;
-  }
+button {
+  margin:0;
+  border:0;
+  width:32%;
+  cursor:pointer;
+  padding:5px 0;
+  font-weight:bold;
+  font-size:0.8em;
+  border-right:#000;
+  opacity:0.6;
+}
 
-  .event > .rtt {
-    display:none;
-  }
+button:hover {
+  opacity:0.8;
+}
 
-  .event:hover > .rtt {
-    display:block;
-    color:black;
-    cursor:pointer;
-    font-family: monospace
-  }
+button.active{
+  opacity:1;
+}
 
-  #loading { 
-    font-size:50em;
-    color:rgba(0,0,0,0.05)
-  }
+#header {
+  position:absolute;
+  top:0px;
+  left:0px;
+  right:0px;
+  font-size: clamp(3rem, 2vw, 10em);
+  z-index:10;
+  padding:10px 50px;
+  z-index:0;
+}
 
+#header .sitetitle {
+  color:rgba(0,0,0,0.3);
+}
+
+#header .byline {
+  color:rgba(0,0,0,0.1);
+  float:right;
+}
+
+#header .info {
+  color:rgba(0,0,0,0.3);
+  cursor:pointer;
+  display:inline-block;
+  font-weight:bolder
+}
+
+.main.section {
+  position: fixed !important;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.event {
+  width: 2.5%;
+  margin: 0;
+  padding: 0;
+  break-inside: avoid;
+  opacity: 0.5;
+  transition: opacity 10s ease;
+}
+
+.event:hover {
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+}
+
+.event > .rtt {
+  display:none;
+}
+
+.event:hover > .rtt {
+  display:block;
+  color:black;
+  cursor:pointer;
+  font-family: monospace;
+}
+
+#loading { 
+  font-size: clamp(5rem, 10vw, 50em); /* Responsive font size */
+  color:rgba(0,0,0,0.05);
+}
+
+#stats {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.5);
+  transform: translateY(-50%);
+}
+
+#stats .metric {
+  width: 33%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+#stats .metric > * {
+  display:block;
+}
+
+#stats .metric .key {
+  font-size: clamp(2rem, 5vw, 5em); /* Responsive font size */
+}
+
+#stats .metric .value {
+  font-size: clamp(6rem, 12vw, 25em); /* Responsive font size */
+}
+
+@media (max-width: 600px) {
   #stats {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    display: flex; /* Use flex display */
-    align-items: center; /* Align items vertically in the center */
-    justify-content: center; /* Center the items horizontally (if needed) */
-    color: rgba(0, 0, 0, 0.5);
-    transform: translateY(-50%); /* Adjust top positioning to truly center */
+    flex-direction: column;
   }
 
   #stats .metric {
-    width: 33%;
-    display: flex; /* Use flex display */
-    flex-direction: column; /* Stack children vertically */
-    justify-content: center; /* Center the content vertically */
-    text-align: center;
+    width: 100%;
+    margin-bottom: 20px;
   }
-
-
-  #stats .metric > * {
-    display:block;
-  }
-
-  #stats .metric .key {
-    font-size:5em
-  }
-
-  #stats .metric .value {
-    font-size:20em
-  }
+}
 </style>
