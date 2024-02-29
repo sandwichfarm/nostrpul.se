@@ -21,7 +21,7 @@
 
   const MONITOR =
     "cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974";
-  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 2.1;
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 4;
 
   let currentRelayModal = null;
   let currentGenericModal = null;
@@ -558,20 +558,22 @@
         <p>
           With the advent of nostr, proprietary, centralized APIs are a relic of
           a bygone era, only clinged onto by those who wish to control the
-          future. It was obvious to me that relay data should be protocol level,
-          as the proprietary, centralized control over this data could lead to
-          centralization and censorship. By having the network data free and
-          accessible over nostr, that can be provided by any number of monitors,
-          we can cross-reference data to identify dark patterns, instead of
-          allowing those dark patterns to go unnoticed, served over proprietary
+          future. In late-2022 it was obvious to me that relay data should be protocol level,
+          as the proprietary control over this data could lead to
+          centralization and censorship. 
+        </p>
+        <p>
+          By liberating network data for free and making it
+          accessible over nostr, there can be an open marketplace for data
+          we can cross-reference. This can help to identify dark patterns, instead of
+          allowing those dark patterns to go unnoticed, whgen served over proprietary
           APIs.
         </p>
         <p>
           I've spent the better part of a year analyzing, understanding and
-          reporting on nostr relays. Contrary to the belief of some cats, relays <strong
-            >are not just generalized data-warehouses.</strong
-          > Just like your favorite nostr client, for better or worse, relays can
-          be whatever the fuck you want them to be
+          reporting on nostr relays. Contrary to the belief of some cats, relays <strong>
+          are not just generalized data-warehouses.</strong> Just like your favorite 
+          nostr client, for better or worse, relays can be whatever the fuck you want them to be
         </p>
       </div>
     </Modal>
