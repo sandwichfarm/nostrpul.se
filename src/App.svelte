@@ -20,7 +20,7 @@
   import { generateBackground } from "./utils";
 
   const MONITOR =
-    "cd18a5109bd5a3110e173331d873725dbf0c5bedc9357a3cc80ed7029b24e974";
+    "abcde937081142db0d50d29bf92792d4ee9b3d79a83c483453171a6004711832";
   const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 4;
 
   let currentRelayModal = null;
