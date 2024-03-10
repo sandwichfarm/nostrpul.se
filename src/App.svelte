@@ -121,7 +121,10 @@
   const on_event_handler = (event) => {
     if (initialSyncComplete && event.created_at < since) return;
     const processedEvent = processEvent(event);
-    if(processedEvent.tags.filter(tag => tag[0] === 'rtt').length === 0) return
+    if(processedEvent.tags.filter(tag => tag[0] === 'rtt').length === 0) {
+      console.log(processedEvent.dTag, processedEvent.tags)
+      return
+    }
     since = event.created_at;
     if (!initialSyncComplete) 
       updateEvents(processedEvent);
