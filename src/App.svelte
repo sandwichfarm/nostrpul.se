@@ -140,7 +140,7 @@
         kinds: [30066],
         authors: [MONITOR],
       },
-      { since: Math.round(Date.now() / 1000) - 60 * 60 * 2 },
+      { since },
       { skipVerification: true, sort: true },
     );
     for await (const ev of iter) {
