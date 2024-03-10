@@ -21,7 +21,7 @@
 
   const MONITOR =
     "abcde937081142db0d50d29bf92792d4ee9b3d79a83c483453171a6004711832";
-  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 4;
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 24;
 
   let currentRelayModal = null;
   let currentGenericModal = null;
