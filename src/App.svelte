@@ -135,7 +135,7 @@
   async function initialSync() {
     const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
-      ["wss://history.nostr.watch"],
+      ["wss://relaypag.es"],
       {
         kinds: [30066],
         authors: [MONITOR],
@@ -152,7 +152,7 @@
   }
 
   const continuousSync = async () => {
-    RelaySocket = await Relay.connect("wss://history.nostr.watch").catch(
+    RelaySocket = await Relay.connect("wss://relaypag.es").catch(
       continuousSync,
     );
     RelaySocket.subscribe(
@@ -185,7 +185,7 @@
   async function get30166(relay) {
     console.log(`getting 30166 for ${relay.url}`);
     return new Promise(async (resolve) => {
-      RelaySocket = await Relay.connect("wss://history.nostr.watch").catch(
+      RelaySocket = await Relay.connect("wss://relaypag.es").catch(
         console.error,
       );
       RelaySocket.subscribe(
@@ -328,7 +328,7 @@
   function calculateDimensions(event) {
     // Default dimension and RTT scaling factor
     const defaultDimension = 150; // Base size of the block
-    const rttScalingFactor = 0.05; // Determines how much RTT affects the size
+    const rttScalingFactor = 0.02; // Determines how much RTT affects the size
 
     // Max RTT value for scaling
     const maxRTT = 10000; // Example max value, adjust based on expected RTT range
