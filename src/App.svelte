@@ -11,7 +11,7 @@
   import ToneGenerator from "./tone";
 
   import { NostrFetcher } from "nostr-fetch";
-  import { Relay } from "nostr-tools";
+  import { Relay, SimplePool } from "nostr-tools";
 
   import Masonry from "masonry-layout";
 
@@ -20,14 +20,15 @@
   import { generateBackground } from "./utils";
 
   const MONITOR =
-    "abcde937081142db0d50d29bf92792d4ee9b3d79a83c483453171a6004711832";
+    "9bbbb845e5b6c831c29789900769843ab43bb5047abe697870cb50b6fc9bf923";
   const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 24;
 
   let currentRelayModal = null;
   let currentGenericModal = null;
 
   let RelaySocket;
-  let RelayPool;
+  let RelayPool = new SimplePool();
+  const relays = ["wss://relaypag.es", "wss://history.nostr.watch", "wss://relay.nostr.watch"];
 
   const k30066 = writable([]);
   const k30166 = writable([]);
@@ -135,7 +136,7 @@
   async function initialSync() {
     const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
-      ["wss://relaypag.es"],
+      relays,
       {
         kinds: [30066],
         authors: [MONITOR],
@@ -152,34 +153,60 @@
   }
 
   const continuousSync = async () => {
-    RelaySocket = await Relay.connect("wss://relaypag.es").catch(
-      continuousSync,
-    );
-    RelaySocket.subscribe(
-      [
-        {
-          limit: 1000,
-          kinds: [30066],
-          authors: [MONITOR],
-          since,
-        },
-      ],
+    let h = RelayPool.subscribeMany(
+    [...relays],
+    [
       {
-        onevent(event) {
-          on_event_handler(event);
-        },
-        onclose() {
-          const reconnect = 2000;
-          console.log(`Subscription closed, reconnecting in ${reconnect}`);
-          setTimeout(continuousSync, reconnect);
-        },
-        oneose() {
-          console.log("EOSE");
-          processBatch();
-          initialSyncComplete = true;
-        },
+        limit: 10000,
+        kinds: [30066],
+        authors: [MONITOR],
+        since,
+      }
+    ],
+    {
+      onevent(event) {
+        on_event_handler(event);
       },
-    );
+      onclose() {
+        const reconnect = 2000;
+        console.log(`Subscription closed, reconnecting in ${reconnect}`);
+        setTimeout(continuousSync, reconnect);
+      },
+      oneose() {
+        console.log("EOSE");
+        processBatch();
+        initialSyncComplete = true;
+      },
+    },
+  )
+    // RelaySocket = await Relay.connect("wss://relaypag.es").catch(
+    //   continuousSync,
+    // );
+    // RelaySocket.subscribe(
+    //   [
+    //     {
+    //       limit: 1000,
+    //       kinds: [30066],
+    //       authors: [MONITOR],
+    //       since,
+    //     },
+    //   ],
+    //   {
+    //     onevent(event) {
+    //       on_event_handler(event);
+    //     },
+    //     onclose() {
+    //       const reconnect = 2000;
+    //       console.log(`Subscription closed, reconnecting in ${reconnect}`);
+    //       setTimeout(continuousSync, reconnect);
+    //     },
+    //     oneose() {
+    //       console.log("EOSE");
+    //       processBatch();
+    //       initialSyncComplete = true;
+    //     },
+    //   },
+    // );
   };
 
   async function get30166(relay) {
