@@ -212,10 +212,8 @@
   async function get30166(relay) {
     console.log(`getting 30166 for ${relay.url}`);
     return new Promise(async (resolve) => {
-      RelaySocket = await Relay.connect("wss://relaypag.es").catch(
-        console.error,
-      );
-      RelaySocket.subscribe(
+      RelayPool.subscribeMany(
+        [...relays],
         [
           {
             "#d": [relay],
