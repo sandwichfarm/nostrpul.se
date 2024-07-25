@@ -466,9 +466,9 @@
   <div id="stats">
     <div id="online" class="metric">
       <span class="value">{$k30066.length}</span>
-      <span class="key">online</span>
+      <span class="key">relays online</span>
     </div>
-    <div id="readable" class="metric">
+    <!-- <div id="readable" class="metric">
       <span class="value"
         >{$k30066.filter(
           (event) =>
@@ -487,7 +487,7 @@
         ).length}</span
       >
       <span class="key">writable</span>
-    </div>
+    </div> -->
   </div>
   <main class="main section">
     <div id="k30066">
