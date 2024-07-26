@@ -461,7 +461,7 @@
       on:keydown={(event) => event.key === 'Enter' && showGenericModal(ev.id)}>
         ⓘ
     </a>  -->
-    <span class="byline"><em><strong>nostr is the api</strong></em></span>
+    <span class="byline"><em><strong>NIP-66 draft6</strong></em></span>
   </div>
   <div id="stats">
     <div id="online" class="metric">
