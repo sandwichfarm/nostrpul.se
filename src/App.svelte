@@ -19,9 +19,13 @@
 
   import { generateBackground } from "./utils";
 
-  const MONITOR =
-    "9bbbb845e5b6c831c29789900769843ab43bb5047abe697870cb50b6fc9bf923";
-  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60 * 24;
+  // draft7 prod
+  const DEFAULT_MONITOR = "9bbbb845e5b6c831c29789900769843ab43bb5047abe697870cb50b6fc9bf923";
+
+  //draft7 dev
+  // const DEFAULT_MONITOR = "472a3c602c881f871ff5034e53c8353a4a52a64dd1b7d8b7d4d8d76e0be8a244";
+    
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60;
 
   let currentRelayModal = null;
   let currentGenericModal = null;
@@ -30,7 +34,12 @@
   let RelayPool = new SimplePool();
   const relays = ["wss://relaypag.es", "wss://history.nostr.watch", "wss://relay.nostr.watch"];
 
-  const k30066 = writable([]);
+  let monitorChanged = false
+  const activeMonitor = writable(DEFAULT_MONITOR)
+  const doNotReconnect = writable(false)
+  const activeSubscription = writable({})
+  const monitorThreshold = writable(ONLINE_THRESHOLD)
+  const monitors = writable(new Map())
   const k30166 = writable([]);
   const loading30166 = writable(false);
   const event30166 = writable(null);
@@ -40,7 +49,7 @@
   let loading = true;
   let masonry;
   let initialSyncComplete = false;
-  let since = ONLINE_THRESHOLD
+  let since = $monitorThreshold
 
   const newEvents = [];
   
@@ -97,8 +106,8 @@
 
   const updateEvents = (processedEvent) => {
     if (processedEvent) {
-      k30066.update((currentk30066) => {
-        return [processedEvent, ...currentk30066]
+      k30166.update((currentk30166) => {
+        return [processedEvent, ...currentk30166]
           .filter(
             (v, i, a) => a.findIndex((t) => t.dTag === v.dTag) === i,
           )
@@ -122,10 +131,6 @@
   const on_event_handler = (event) => {
     if (initialSyncComplete && event.created_at < since) return;
     const processedEvent = processEvent(event);
-    // if(processedEvent.tags.filter(tag => tag[0] === 'rtt').length === 0) {
-    //   console.log(processedEvent.dTag, processedEvent.tags)
-    //   return
-    // }
     since = event.created_at;
     if (!initialSyncComplete) 
       updateEvents(processedEvent);
@@ -133,33 +138,117 @@
       queueEvent(processedEvent);
   };
 
+  async function syncMonitorData(){
+    const promises = []
+    await new Promise( resolve => {
+      RelayPool.subscribeMany(
+        relays,
+        [{kinds: [10166], limit: 10000}],
+        {
+          onevent(event) {
+            monitors.update( monitors => {
+              const obj = monitors.get(event.pubkey) || {} 
+              obj['10166'] = event 
+              monitors.set(event.pubkey, obj)
+              return monitors
+            })
+            promises.push(getMonitorStuff(event.pubkey))
+          },
+          oneose() {
+            //console.log('done!!!')
+            resolve()
+          },
+        }
+      )
+    })
+    //console.log('waiting....')
+    const stuff = await Promise.allSettled(promises)
+    //console.log('allsettled')
+    for(const res of stuff){
+      if(res.status === 'fulfilled') {
+        const {profile, relayList} = res.value
+        monitors.update( ms => {
+          const obj = ms.get(profile.pubkey) || {}
+          obj['0'] = profile
+          obj['10002'] = relayList
+          ms.set(profile.pubkey, obj)
+          return ms
+        })
+      }
+    }
+    //console.log(Array.from($monitors.values()))
+  }
+
+  async function getMonitorStuff(pubkey){
+    let profile
+    let relayList 
+    return new Promise( resolve => {
+      const sub = RelayPool.subscribeMany(
+        ['wss://purplepag.es', 'wss://user.kindpag.es'],
+        [
+          {kinds: [0, 10002], authors: [pubkey]}
+        ],
+        {
+          onevent(event) {
+            if(event.kind === 0){
+              profile = event
+            }
+            if(event.kind === 10002){
+              relayList = event
+            }
+            if(profile && relayList) {
+              sub.close()
+              resolve({profile, relayList})
+            }
+          }
+        }
+      )
+    })
+  }
+
+  async function changeMonitor(pubkey) {
+    if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
+    //console.log('onchange')
+    $k30166 = []
+    $doNotReconnect = true
+    $activeSubscription.close()
+    $monitorThreshold = parseInt($monitors.get($activeMonitor)?.['10166']?.tags.find(tag => tag[0] === 'freqency')?.[1])
+    monitorChanged = true
+    $doNotReconnect = false
+    await syncMonitorEvents()
+  }
+
   async function initialSync() {
+    await syncMonitorData()
+    await syncMonitorEvents()
+  }
+
+  async function syncMonitorEvents(){
+    //console.log('syncing monitor events', $activeMonitor)
     const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
       relays,
       {
-        kinds: [30066],
-        authors: [MONITOR],
+        kinds: [30166],
+        authors: [$activeMonitor],
       },
       { since },
       { skipVerification: true },
     );
     for await (const ev of iter) {
+      //console.log(ev)
       on_event_handler(ev);
     }
-    // initialSyncComplete=true
-    // processBatch()
-    // return Promise.resolve
   }
 
   const continuousSync = async () => {
-    let h = RelayPool.subscribeMany(
+    return RelayPool.subscribeMany(
     [...relays],
     [
       {
         limit: 10000,
-        kinds: [30066],
-        authors: [MONITOR],
+        kinds: [30166],
+        authors: [$activeMonitor],
         since,
       }
     ],
@@ -168,12 +257,13 @@
         on_event_handler(event);
       },
       onclose() {
+        if($doNotReconnect) return
         const reconnect = 2000;
-        console.log(`Subscription closed, reconnecting in ${reconnect}`);
+        //console.log(`Subscription closed, reconnecting in ${reconnect}`);
         setTimeout(continuousSync, reconnect);
       },
       oneose() {
-        console.log("EOSE");
+        //console.log("EOSE");
         processBatch();
         initialSyncComplete = true;
       },
@@ -186,8 +276,8 @@
     //   [
     //     {
     //       limit: 1000,
-    //       kinds: [30066],
-    //       authors: [MONITOR],
+    //       kinds: [30166],
+    //       authors: [$activeMonitor],
     //       since,
     //     },
     //   ],
@@ -197,11 +287,11 @@
     //     },
     //     onclose() {
     //       const reconnect = 2000;
-    //       console.log(`Subscription closed, reconnecting in ${reconnect}`);
+    //       //console.log(`Subscription closed, reconnecting in ${reconnect}`);
     //       setTimeout(continuousSync, reconnect);
     //     },
     //     oneose() {
-    //       console.log("EOSE");
+    //       //console.log("EOSE");
     //       processBatch();
     //       initialSyncComplete = true;
     //     },
@@ -210,7 +300,7 @@
   };
 
   async function get30166(relay) {
-    console.log(`getting 30166 for ${relay.url}`);
+    //console.log(`getting 30166 for ${relay.url}`);
     return new Promise(async (resolve) => {
       RelayPool.subscribeMany(
         [...relays],
@@ -219,7 +309,7 @@
             "#d": [relay],
             limit: 1,
             kinds: [30166],
-            authors: [MONITOR],
+            authors: [$activeMonitor],
             since: Math.round(Date.now() / 1000) - 60 * 60 * 2,
           },
         ],
@@ -232,9 +322,9 @@
     });
   }
 
-  k30066.subscribe(async ($k30066) => {
-    await tick(); // Wait for DOM updates
-
+  k30166.subscribe(async ($k30166) => {
+    //console.log('k30166', $k30166.length)
+    await tick();
     if (initialSyncComplete && !masonry) {
       initializeMasonry();
     } else if (masonry) {
@@ -244,7 +334,7 @@
   });
 
   function initializeMasonry() {
-    masonry = new Masonry("#k30066", {
+    masonry = new Masonry("#k30166", {
       itemSelector: ".event",
       percentPosition: true,
       horizontalOrder: true,
@@ -272,7 +362,7 @@
     return event.tags.filter((tag) => tag[0] == "d")?.[0]?.[1];
   }
 
-  function parse30066(event) {
+  function parse30166(event) {
     const parsedTags = {};
     const url = getUrlFromEvent(event);
     if (!url) return { error: "no d tag?" };
@@ -301,7 +391,7 @@
         }
       }
     });
-    if (!parsedTags?.rtt?.open)
+    if (!parsedTags?.['rtt-open'])
       return { error: "no rtt connect tag?", tags: tags };
     return { url, ...parsedTags };
   }
@@ -338,7 +428,7 @@
   onMount(async () => {
     await initialSync();
     eventRunner = setInterval( populateNextEvent, 250 )
-    await continuousSync();
+    $activeSubscription = await continuousSync();
     return () => {
       clearInterval(eventRunner)
       RelaySocket.close();
@@ -347,7 +437,7 @@
 
   function processBatch() {
     if (!initialSyncComplete) initialSyncComplete = true;
-    k30066.update((currentk30066) => [...currentk30066]);
+    k30166.update((currentk30166) => [...currentk30166]);
   }
 
   function calculateDimensions(event) {
@@ -361,8 +451,8 @@
     // Check if the event has RTT data
     if (event.tags && Array.isArray(event.tags)) {
       const rttValues = event.tags
-        .filter((tag) => tag[0] === "rtt")
-        .map((tag) => parseInt(tag[2], 10));
+        .filter((tag) => tag[0].includes('rtt'))
+        .map((tag) => parseInt(tag[1], 10));
       const totalRTT = rttValues.reduce((acc, rtt) => acc + rtt, 0);
 
       // Calculate the scaled dimension inversely related to RTT
@@ -378,21 +468,6 @@
       return defaultDimension;
     }
   }
-
-  // function calculateDimensions(event) {
-  //   // Default dimension and RTT scaling factor
-  //   const defaultDimension = 50; // Base size of the block
-  //   const rttScalingFactor = 0.05; // Determines how much RTT affects the size
-
-  //   // Check if the event has RTT data
-  //   if (event.tags && Array.isArray(event.tags)) {
-  //     const rttValues = event.tags.filter(tag => tag[0] === 'rtt').map(tag => parseInt(tag[2], 10));
-  //     const totalRTT = rttValues.reduce((acc, rtt) => acc + rtt, 0);
-  //     return defaultDimension + (totalRTT * rttScalingFactor);
-  //   } else {
-  //     return defaultDimension;
-  //   }
-  // }
 
   function generateSaturatedColorFromTag(str) {
     let hash = 0;
@@ -411,9 +486,9 @@
   }
 
   function getRttFromEvent(key, event) {
-    const rtt = event.tags.filter(
-      (tag) => tag[0] === "rtt" && tag[1] === key,
-    )?.[0]?.[2];
+    const rtt = event.tags.find(
+      (tag) => tag[0].includes("rtt") && tag[0].includes(key),
+    )?.[1];
     return rtt ? rtt : "";
   }
 
@@ -439,6 +514,10 @@
       masonry.layout();
     }
   });
+
+  $: getMonitors = Array.from($monitors.keys())
+  $: getMonitor = (pubkey) => $monitors.get(pubkey)
+  $: getMonitorName = (pubkey) => JSON.parse(getMonitor(pubkey)?.['0']?.content)?.name
 </script>
 
 {#if initialSyncComplete}
@@ -450,6 +529,7 @@
   >
     {isMuted ? "🔇" : "🔈"}
   </button>
+
   <div id="header">
     <span class="sitetitle">nostrpul.se</span>
     <span class="credit">by nostr.watch</span>
@@ -461,16 +541,16 @@
       on:keydown={(event) => event.key === 'Enter' && showGenericModal(ev.id)}>
         ⓘ
     </a>  -->
-    <span class="byline"><em><strong>NIP-66 draft6</strong></em></span>
+    <span class="byline"><em><strong>NIP-66 draft 7</strong></em></span>
   </div>
   <div id="stats">
     <div id="online" class="metric">
-      <span class="value">{$k30066.length}</span>
+      <span class="value">{$k30166.length}</span>
       <span class="key">relays online</span>
     </div>
     <!-- <div id="readable" class="metric">
       <span class="value"
-        >{$k30066.filter(
+        >{$k30166.filter(
           (event) =>
             event.tags.filter((tag) => tag[0] === "rtt" && tag[1] === "read")
               .length > 0,
@@ -480,7 +560,7 @@
     </div>
     <div id="writable" class="metric">
       <span class="value"
-        >{$k30066.filter(
+        >{$k30166.filter(
           (event) =>
             event.tags.filter((tag) => tag[0] === "rtt" && tag[1] === "write")
               .length > 0,
@@ -490,8 +570,8 @@
     </div> -->
   </div>
   <main class="main section">
-    <div id="k30066">
-      {#each $k30066 as ev (ev.id)}
+    <div id="k30166">
+      {#each $k30166 as ev (ev.id)}
         <div
           class="event"
           style={`height: ${ev.dimension}px; background-color: ${ev.backgroundColor};`}
@@ -510,62 +590,13 @@
         {#if currentRelayModal === ev.id}
           <Modal showModal={true} on:close={hideModals} {ev}>
             <span slot="header">{getUrlFromEvent(ev)}</span>
-            <div class="tabs">
-              <button
-                on:click={() => ($activeTab = 0)}
-                style="background-color: {ev.backgroundColor}"
-                class={$activeTab === 0 ? "active" : ""}
-              >
-                PARSED 30066
-              </button>
-              <button
-                on:click={() => ($activeTab = 1)}
-                style="background-color: {ev.backgroundColor}"
-                class={$activeTab === 1 ? "active" : ""}
-              >
-                RAW 30066
-              </button>
-              <button
-                on:click={() => {
-                  $activeTab = 2;
-                }}
-                style="background-color: {ev.backgroundColor}"
-                class={$activeTab === 2 ? "active" : ""}
-              >
-                RAW 30166
-              </button>
-            </div>
-            <div class="tab-contents">
-              {#if $activeTab === 0 && currentRelayModal === ev.id}
-                <div class="tab-content">
-                  <pre>{JSON.stringify(parse30066(ev), null, 4)}</pre>
-                </div>
-              {/if}
-              {#if $activeTab === 1 && currentRelayModal === ev.id}
-                <div class="tab-content">
-                  <pre>{JSON.stringify(
-                      removeExtraFieldsFromEvent(ev),
-                      null,
-                      4,
-                    )}</pre>
-                </div>
-              {/if}
-              {#if $activeTab === 2 && currentRelayModal === ev.id}
-                <div class="tab-content">
-                  {#if $loading30166}
-                    <p>Loading 30166 event...</p>
-                  {:else if $event30166}
-                    <!-- Render your eventData here -->
-                    <pre>{JSON.stringify($event30166, null, 4)}</pre>
-                  {:else}
-                    <p>Non 30166 event for this relay. (try again?)</p>
-                  {/if}
-                </div>
-              {/if}
-              <p></p>
-              <pre></pre>
-            </div>
-
+            <pre>
+              {JSON.stringify(
+                removeExtraFieldsFromEvent(ev),
+                null,
+                4,
+              )}
+            </pre>
             <!-- <pre>{JSON.stringify(ev, null, 4)}</pre> -->
           </Modal>
         {/if}
@@ -573,40 +604,14 @@
     </div>
   </main>
 
-  {#if currentGenericModal === "info"}
-    <Modal showModal={true} on:close={hideModals}>
-      <div class="pontification">
-        <p>
-          nostrpul.se is a demonstration of <a
-            href="https://github.com/nostr-protocol/nips/pull/230"
-            target="_new">NIP-66</a
-          >
-          events, built to increase awareness of
-          <strong>protocol-level relay meta-data and discoverability.</strong>
-        </p>
-        <p>
-          With the advent of nostr, proprietary, centralized APIs are a relic of
-          a bygone era, only clinged onto by those who wish to control the
-          future. In late-2022 it was obvious to me that relay data should be protocol level,
-          as the proprietary control over this data could lead to
-          centralization and censorship. 
-        </p>
-        <p>
-          By liberating network data for free and making it
-          accessible over nostr, there can be an open marketplace for data
-          we can cross-reference. This can help to identify dark patterns, instead of
-          allowing those dark patterns to go unnoticed, whgen served over proprietary
-          APIs.
-        </p>
-        <p>
-          I've spent the better part of a year analyzing, understanding and
-          reporting on nostr relays. Contrary to the belief of some cats, relays <strong>
-          are not just generalized data-warehouses.</strong> Just like your favorite 
-          nostr client, for better or worse, relays can be whatever the fuck you want them to be
-        </p>
-      </div>
-    </Modal>
-  {/if}
+  <!-- <div id="selector" style="z-index: 9999">
+    <select bind:value={$activeMonitor} on:change={() => changeMonitor()}>
+      {#each getMonitors as pubkey}
+        <option value={pubkey}>{getMonitorName(pubkey)}</option>
+      {/each}
+      <option value="all">all</option>
+    </select>
+  </div> -->
 {:else}
   <div id="loading">loading</div>
 {/if}
@@ -641,6 +646,11 @@
     opacity: 1;
   }
 
+  #selector {
+    z-index: 300;
+    position: relative;
+  }
+
   #header {
     position: absolute;
     top: 0px;
@@ -662,8 +672,9 @@
   }
 
   #header .byline {
-    color: rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.3);
     float: right;
+    font-size: clamp(1.5rem, 1.5vw, 4em);
   }
 
   #header .info {
