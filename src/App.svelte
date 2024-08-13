@@ -32,7 +32,7 @@
 
   let RelaySocket;
   let RelayPool = new SimplePool();
-  const relays = ["wss://relaypag.es", "wss://history.nostr.watch", "wss://relay.nostr.watch"];
+  const relays = ["wss://relaypag.es", "wss://relay.nostr.watch"];
 
   let monitorChanged = false
   const activeMonitor = writable(DEFAULT_MONITOR)
@@ -55,42 +55,42 @@
   
   let eventRunner
 
-  $: if ($activeTab) {
-    event30166.set(null);
-    const ev = get30166($focusRelay)
-      .then((ev) => {
-        event30166.set(ev);
-        loading30166.set(false);
-      })
-      .catch(console.error);
-  }
+  // $: if ($activeTab) {
+  //   event30166.set(null);
+  //   const ev = get30166($focusRelay)
+  //     .then((ev) => {
+  //       event30166.set(ev);
+  //       loading30166.set(false);
+  //     })
+  //     .catch(console.error);
+  // }
 
   // let currentRelayModal = null;
 
-  function hideModals() {
-    activeTab.set(0);
-    focusRelay.set(null);
-    event30166.set(null);
-    hideGenericModal();
-    hideRelayModal();
-  }
+  // function hideModals() {
+  //   activeTab.set(0);
+  //   focusRelay.set(null);
+  //   event30166.set(null);
+  //   hideGenericModal();
+  //   hideRelayModal();
+  // }
 
-  function showGenericModal(id) {
-    currentGenericModal = id;
-  }
+  // function showGenericModal(id) {
+  //   currentGenericModal = id;
+  // }
 
-  function hideGenericModal() {
-    currentGenericModal = null;
-  }
+  // function hideGenericModal() {
+  //   currentGenericModal = null;
+  // }
 
-  function showRelayModal(ev) {
-    focusRelay.set(getUrlFromEvent(ev));
-    currentRelayModal = ev.id;
-  }
+  // function showRelayModal(ev) {
+  //   focusRelay.set(getUrlFromEvent(ev));
+  //   currentRelayModal = ev.id;
+  // }
 
-  function hideRelayModal() {
-    currentRelayModal = null;
-  }
+  // function hideRelayModal() {
+  //   currentRelayModal = null;
+  // }
 
   function processEvent(event) {
     const dTag = event.tags.find((tag) => tag[0] === "d");
@@ -143,10 +143,12 @@
     await new Promise( resolve => {
       RelayPool.subscribeMany(
         relays,
-        [{kinds: [10166], limit: 10000}],
+        [{kinds: [10166], limit: 100}],
         {
           onevent(event) {
+            console.log('monitor event', event.id)
             monitors.update( monitors => {
+              if(!event?.pubkey) return
               const obj = monitors.get(event.pubkey) || {} 
               obj['10166'] = event 
               monitors.set(event.pubkey, obj)
@@ -155,17 +157,18 @@
             promises.push(getMonitorStuff(event.pubkey))
           },
           oneose() {
-            //console.log('done!!!')
+            console.log('done!!!')
             resolve()
           },
         }
       )
     })
-    //console.log('waiting....')
+    console.log('waiting....')
     const stuff = await Promise.allSettled(promises)
-    //console.log('allsettled')
+    console.log('allsettled')
     for(const res of stuff){
       if(res.status === 'fulfilled') {
+        if(!res.value?.profile || !res.value?.relayList) continue
         const {profile, relayList} = res.value
         monitors.update( ms => {
           const obj = ms.get(profile.pubkey) || {}
@@ -176,6 +179,8 @@
         })
       }
     }
+
+    console.log('monitors synced')
     //console.log(Array.from($monitors.values()))
   }
 
@@ -183,6 +188,10 @@
     let profile
     let relayList 
     return new Promise( resolve => {
+      const to = setTimeout(() => {
+        console.log('timeout')
+        resolve()
+      }, 3000)
       const sub = RelayPool.subscribeMany(
         ['wss://purplepag.es', 'wss://user.kindpag.es'],
         [
@@ -190,6 +199,7 @@
         ],
         {
           onevent(event) {
+            console.log('monitor stuff', event.id)
             if(event.kind === 0){
               profile = event
             }
@@ -198,6 +208,8 @@
             }
             if(profile && relayList) {
               sub.close()
+              console.log('done!!! again')
+              clearTimeout(to)
               resolve({profile, relayList})
             }
           }
@@ -219,12 +231,15 @@
   }
 
   async function initialSync() {
+    console.log('initial sync')
     await syncMonitorData()
+    console.log('syncMonitorData complete')
     await syncMonitorEvents()
+    console.log('syncMonitorEvents complete')
   }
 
   async function syncMonitorEvents(){
-    //console.log('syncing monitor events', $activeMonitor)
+    console.log('syncing monitor events', $activeMonitor)
     const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
       relays,
@@ -235,8 +250,9 @@
       { since },
       { skipVerification: true },
     );
+    console.log('iterating')
     for await (const ev of iter) {
-      //console.log(ev)
+      console.log(ev.id)
       on_event_handler(ev);
     }
   }
@@ -254,6 +270,7 @@
     ],
     {
       onevent(event) {
+        console.log('event', event.id)
         on_event_handler(event);
       },
       onclose() {
@@ -315,6 +332,7 @@
         ],
         {
           onevent(event) {
+            console.log('event', event.id)
             resolve(event);
           },
         },
