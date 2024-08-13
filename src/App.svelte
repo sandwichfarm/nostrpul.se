@@ -42,7 +42,7 @@
   const monitors = writable(new Map())
   const k30166 = writable([]);
   const loading30166 = writable(false);
-  const event30166 = writable(null);
+  // const event30166 = writable(null);
   let activeTab = writable(0); // Currently selected tab index
   let focusRelay = writable(null);
 
@@ -70,8 +70,8 @@
   function hideModals() {
     activeTab.set(0);
     focusRelay.set(null);
-    event30166.set(null);
-    hideGenericModal();
+    // event30166.set(null);
+    // hideGenericModal();
     hideRelayModal();
   }
 
@@ -146,7 +146,7 @@
         [{kinds: [10166], limit: 100}],
         {
           onevent(event) {
-            console.log('monitor event', event.id)
+            //console.log('monitor event', event.id)
             monitors.update( monitors => {
               if(!event?.pubkey) return
               const obj = monitors.get(event.pubkey) || {} 
@@ -157,15 +157,15 @@
             promises.push(getMonitorStuff(event.pubkey))
           },
           oneose() {
-            console.log('done!!!')
+            //console.log('done!!!')
             resolve()
           },
         }
       )
     })
-    console.log('waiting....')
+    //console.log('waiting....')
     const stuff = await Promise.allSettled(promises)
-    console.log('allsettled')
+    //console.log('allsettled')
     for(const res of stuff){
       if(res.status === 'fulfilled') {
         if(!res.value?.profile || !res.value?.relayList) continue
@@ -180,8 +180,8 @@
       }
     }
 
-    console.log('monitors synced')
-    //console.log(Array.from($monitors.values()))
+    //console.log('monitors synced')
+    ////console.log(Array.from($monitors.values()))
   }
 
   async function getMonitorStuff(pubkey){
@@ -189,7 +189,7 @@
     let relayList 
     return new Promise( resolve => {
       const to = setTimeout(() => {
-        console.log('timeout')
+        //console.log('timeout')
         resolve()
       }, 3000)
       const sub = RelayPool.subscribeMany(
@@ -199,7 +199,7 @@
         ],
         {
           onevent(event) {
-            console.log('monitor stuff', event.id)
+            //console.log('monitor stuff', event.id)
             if(event.kind === 0){
               profile = event
             }
@@ -208,7 +208,7 @@
             }
             if(profile && relayList) {
               sub.close()
-              console.log('done!!! again')
+              //console.log('done!!! again')
               clearTimeout(to)
               resolve({profile, relayList})
             }
@@ -220,7 +220,7 @@
 
   async function changeMonitor(pubkey) {
     if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
-    //console.log('onchange')
+    ////console.log('onchange')
     $k30166 = []
     $doNotReconnect = true
     $activeSubscription.close()
@@ -231,15 +231,15 @@
   }
 
   async function initialSync() {
-    console.log('initial sync')
+    //console.log('initial sync')
     await syncMonitorData()
-    console.log('syncMonitorData complete')
+    //console.log('syncMonitorData complete')
     await syncMonitorEvents()
-    console.log('syncMonitorEvents complete')
+    //console.log('syncMonitorEvents complete')
   }
 
   async function syncMonitorEvents(){
-    console.log('syncing monitor events', $activeMonitor)
+    //console.log('syncing monitor events', $activeMonitor)
     const fetcher = NostrFetcher.init();
     const iter = fetcher.allEventsIterator(
       relays,
@@ -250,9 +250,9 @@
       { since },
       { skipVerification: true },
     );
-    console.log('iterating')
+    //console.log('iterating')
     for await (const ev of iter) {
-      console.log(ev.id)
+      //console.log(ev.id)
       on_event_handler(ev);
     }
   }
@@ -270,17 +270,17 @@
     ],
     {
       onevent(event) {
-        console.log('event', event.id)
+        //console.log('event', event.id)
         on_event_handler(event);
       },
       onclose() {
         if($doNotReconnect) return
         const reconnect = 2000;
-        //console.log(`Subscription closed, reconnecting in ${reconnect}`);
+        ////console.log(`Subscription closed, reconnecting in ${reconnect}`);
         setTimeout(continuousSync, reconnect);
       },
       oneose() {
-        //console.log("EOSE");
+        ////console.log("EOSE");
         processBatch();
         initialSyncComplete = true;
       },
@@ -304,11 +304,11 @@
     //     },
     //     onclose() {
     //       const reconnect = 2000;
-    //       //console.log(`Subscription closed, reconnecting in ${reconnect}`);
+    //       ////console.log(`Subscription closed, reconnecting in ${reconnect}`);
     //       setTimeout(continuousSync, reconnect);
     //     },
     //     oneose() {
-    //       //console.log("EOSE");
+    //       ////console.log("EOSE");
     //       processBatch();
     //       initialSyncComplete = true;
     //     },
@@ -317,7 +317,7 @@
   };
 
   async function get30166(relay) {
-    //console.log(`getting 30166 for ${relay.url}`);
+    ////console.log(`getting 30166 for ${relay.url}`);
     return new Promise(async (resolve) => {
       RelayPool.subscribeMany(
         [...relays],
@@ -332,7 +332,7 @@
         ],
         {
           onevent(event) {
-            console.log('event', event.id)
+            //console.log('event', event.id)
             resolve(event);
           },
         },
@@ -341,7 +341,7 @@
   }
 
   k30166.subscribe(async ($k30166) => {
-    //console.log('k30166', $k30166.length)
+    ////console.log('k30166', $k30166.length)
     await tick();
     if (initialSyncComplete && !masonry) {
       initializeMasonry();
