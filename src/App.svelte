@@ -83,14 +83,14 @@
   //   currentGenericModal = null;
   // }
 
-  // function showRelayModal(ev) {
-  //   focusRelay.set(getUrlFromEvent(ev));
-  //   currentRelayModal = ev.id;
-  // }
+  function showRelayModal(ev) {
+    focusRelay.set(getUrlFromEvent(ev));
+    currentRelayModal = ev.id;
+  }
 
-  // function hideRelayModal() {
-  //   currentRelayModal = null;
-  // }
+  function hideRelayModal() {
+    currentRelayModal = null;
+  }
 
   function processEvent(event) {
     const dTag = event.tags.find((tag) => tag[0] === "d");
