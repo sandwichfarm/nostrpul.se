@@ -67,13 +67,13 @@
 
   // let currentRelayModal = null;
 
-  // function hideModals() {
-  //   activeTab.set(0);
-  //   focusRelay.set(null);
-  //   event30166.set(null);
-  //   hideGenericModal();
-  //   hideRelayModal();
-  // }
+  function hideModals() {
+    activeTab.set(0);
+    focusRelay.set(null);
+    event30166.set(null);
+    hideGenericModal();
+    hideRelayModal();
+  }
 
   // function showGenericModal(id) {
   //   currentGenericModal = id;
