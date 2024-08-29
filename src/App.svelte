@@ -25,14 +25,14 @@
   //draft7 dev
   // const DEFAULT_MONITOR = "472a3c602c881f871ff5034e53c8353a4a52a64dd1b7d8b7d4d8d76e0be8a244";
     
-  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - 60 * 60;
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - (60 * 60 * 2);
 
   let currentRelayModal = null;
   let currentGenericModal = null;
 
   let RelaySocket;
   let RelayPool = new SimplePool();
-  const relays = ["wss://relaypag.es", "wss://relay.nostr.watch"];
+  const relays = ["wss://relay.nostr.watch", "wss://relaypag.es", "wss://history.nostr.watch"];
 
   let monitorChanged = false
   const activeMonitor = writable(DEFAULT_MONITOR)
@@ -146,7 +146,6 @@
         [{kinds: [10166], limit: 100}],
         {
           onevent(event) {
-            //console.log('monitor event', event.id)
             monitors.update( monitors => {
               if(!event?.pubkey) return
               const obj = monitors.get(event.pubkey) || {} 
