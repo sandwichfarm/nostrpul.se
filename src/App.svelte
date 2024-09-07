@@ -25,7 +25,7 @@
   //draft7 dev
   // const DEFAULT_MONITOR = "472a3c602c881f871ff5034e53c8353a4a52a64dd1b7d8b7d4d8d76e0be8a244";
     
-  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - (60 * 60 * 2);
+  const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - (60 * 60 * 6);
 
   let currentRelayModal = null;
   let currentGenericModal = null;
