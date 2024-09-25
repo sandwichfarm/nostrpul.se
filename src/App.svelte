@@ -49,7 +49,8 @@
   const doNotReconnect = writable(false)
   const activeSubscription = writable({})
   const monitorThreshold = writable(ONLINE_THRESHOLD)
-  const monitors = writable(new Map())
+  const monitors = writable([])
+  // const monitors = writable(new Map())
   const k30166 = writable([]);
   const loading30166 = writable(false);
   let activeTab = writable(0);
@@ -65,6 +66,7 @@
   let eventRunner
     
   import WsWorker from "./worker?worker";
+    import { warn } from "tone/build/esm/core/util/Debug";
 
   const worker = new WsWorker();
 
@@ -129,105 +131,111 @@
       queueEvent(processedEvent);
   };
 
-  async function syncMonitorData(){
-    const promises = []
-    await new Promise( resolve => {
-      RelayPool.subscribeMany(
-        relays,
-        [{kinds: [10166], limit: 100}],
-        {
-          onevent(event) {
-            monitors.update( monitors => {
-              if(!event?.pubkey) return
-              const obj = monitors.get(event.pubkey) || {} 
-              obj['10166'] = event 
-              monitors.set(event.pubkey, obj)
-              return monitors
-            })
-            promises.push(getMonitorStuff(event.pubkey))
-          },
-          oneose() {
-            resolve()
-          },
-        }
-      )
-    })
-    const stuff = await Promise.allSettled(promises)
-    for(const res of stuff){
-      if(res.status === 'fulfilled') {
-        if(!res.value?.profile || !res.value?.relayList) continue
-        const {profile, relayList} = res.value
-        monitors.update( ms => {
-          const obj = ms.get(profile.pubkey) || {}
-          obj['0'] = profile
-          obj['10002'] = relayList
-          ms.set(profile.pubkey, obj)
-          return ms
-        })
-      }
-    }
-  }
+  // async function syncMonitorData(){
+  //   const promises = []
+  //   await new Promise( resolve => {
+  //     RelayPool.subscribeMany(
+  //       relays,
+  //       [{kinds: [10166], limit: 100}],
+  //       {
+  //         onevent(event) {
+  //           monitors.update( monitors => {
+  //             if(!event?.pubkey) return
+  //             const obj = monitors.get(event.pubkey) || {} 
+  //             obj['10166'] = event 
+  //             monitors.set(event.pubkey, obj)
+  //             return monitors
+  //           })
+  //           promises.push(getMonitorStuff(event.pubkey))
+  //         },
+  //         oneose() {
+  //           resolve()
+  //         },
+  //       }
+  //     )
+  //   })
+  //   const stuff = await Promise.allSettled(promises)
+  //   for(const res of stuff){
+  //     if(res.status === 'fulfilled') {
+  //       if(!res.value?.profile || !res.value?.relayList) continue
+  //       const {profile, relayList} = res.value
+  //       monitors.update( ms => {
+  //         const obj = ms.get(profile.pubkey) || {}
+  //         obj['0'] = profile
+  //         obj['10002'] = relayList
+  //         ms.set(profile.pubkey, obj)
+  //         return ms
+  //       })
+  //     }
+  //   }
+  // }
 
-  async function getMonitorStuff(pubkey){
-    let profile
-    let relayList 
-    return new Promise( resolve => {
-      const to = setTimeout(() => {
-        //console.log('timeout')
-        resolve()
-      }, 3000)
-      const sub = RelayPool.subscribeMany(
-        ['wss://purplepag.es', 'wss://user.kindpag.es'],
-        [
-          {kinds: [0, 10002], authors: [pubkey]}
-        ],
-        {
-          onevent(event) {
-            if(event.kind === 0){
-              profile = event
-            }
-            if(event.kind === 10002){
-              relayList = event
-            }
-            if(profile && relayList) {
-              sub.close()
-              clearTimeout(to)
-              resolve({profile, relayList})
-            }
-          }
-        }
-      )
-    })
-  }
+  // async function getMonitorStuff(pubkey){
+  //   let profile
+  //   let relayList 
+  //   return new Promise( resolve => {
+  //     const to = setTimeout(() => {
+  //       //console.log('timeout')
+  //       resolve()
+  //     }, 3000)
+  //     const sub = RelayPool.subscribeMany(
+  //       ['wss://purplepag.es', 'wss://user.kindpag.es'],
+  //       [
+  //         {kinds: [0, 10002], authors: [pubkey]}
+  //       ],
+  //       {
+  //         onevent(event) {
+  //           if(event.kind === 0){
+  //             profile = event
+  //           }
+  //           if(event.kind === 10002){
+  //             relayList = event
+  //           }
+  //           if(profile && relayList) {
+  //             sub.close()
+  //             clearTimeout(to)
+  //             resolve({profile, relayList})
+  //           }
+  //         }
+  //       }
+  //     )
+  //   })
+  // }
 
-  async function changeMonitor(pubkey) {
-    if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
-    $k30166 = []
-    $doNotReconnect = true
-    $activeSubscription.close()
-    $monitorThreshold = parseInt($monitors.get($activeMonitor)?.['10166']?.tags.find(tag => tag[0] === 'freqency')?.[1])
-    monitorChanged = true
-    $doNotReconnect = false
-    await syncMonitorEvents()
-  }
+  // async function changeMonitor(pubkey) {
+  //   if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
+  //   $k30166 = []
+  //   $doNotReconnect = true
+  //   $activeSubscription.close()
+  //   $monitorThreshold = parseInt($monitors.get($activeMonitor)?.['10166']?.tags.find(tag => tag[0] === 'freqency')?.[1])
+  //   monitorChanged = true
+  //   $doNotReconnect = false
+  //   await syncMonitorEvents()
+  // }
 
-  async function initialSync() {
-    await syncMonitorData()
-    await syncMonitorEvents()
-  }
+  // async function initialSync() {
+  //   // await syncMonitorData()
+  //   await syncMonitorEvents()
+  // }
 
   async function bindWorker(){
     worker.addEventListener('message', (message) => {
       const { type } = message.data
 
+      if(type === 'monitor'){
+        const { monitor } = message.data
+        
+      }
       if(type === 'event'){
         const { event } = message.data
         on_event_handler(event)
       }
       if(type === 'events'){
-        const { events } = message.data
+        const { events, monitors:_monitors } = message.data
+        let slow = false 
         let lastEvent = 0 
         let timeout
+        monitors.set(_monitors)
         for(const event of events) {
           clearTimeout(timeout)
           on_event_handler(event)
@@ -235,6 +243,12 @@
           timeout = setTimeout( () => { 
             processBatch()
           }, 2000)
+        }
+      }
+      if(type === 'events_excess'){
+        const { events } = message.data
+        for(const event of events) {
+          on_event_handler(event)
         }
       }
       if(type == 'eose'){
@@ -252,32 +266,7 @@
     worker.postMessage({ type: "sync", authors, relays, since })
   };
 
-  async function get30166(relay) {
-    ////console.log(`getting 30166 for ${relay.url}`);
-    return new Promise(async (resolve) => {
-      RelayPool.subscribeMany(
-        [...relays],
-        [
-          {
-            "#d": [relay],
-            limit: 1,
-            kinds: [30166],
-            authors: [...$activeMonitor],
-            since: Math.round(Date.now() / 1000) - 60 * 60 * 2,
-          },
-        ],
-        {
-          onevent(event) {
-            //console.log('event', event.id)
-            resolve(event);
-          },
-        },
-      );
-    });
-  }
-
   k30166.subscribe(async ($k30166) => {
-    ////console.log('k30166', $k30166.length)
     await tick();
     if (initialSyncComplete && !masonry) {
       initializeMasonry();
@@ -316,69 +305,6 @@
     return event.tags.filter((tag) => tag[0] == "d")?.[0]?.[1];
   }
 
-  function parse30166(event) {
-    const parsedTags = {};
-    const url = getUrlFromEvent(event);
-    if (!url) return { error: "no d tag?" };
-    const tags = event.tags.filter((tag) => tag.length >= 3);
-    tags.forEach((tag) => {
-      const [key, subkey, ...values] = tag;
-      if (!parsedTags[key]) {
-        parsedTags[key] = {};
-      }
-      if (!parsedTags[key][subkey]) {
-        parsedTags[key][subkey] =
-          values.length > 1
-            ? values.map((v) => castValue(v))
-            : castValue(values[0]);
-      } else {
-        if (Array.isArray(parsedTags[key][subkey])) {
-          parsedTags[key][subkey] = [
-            ...parsedTags[key][subkey],
-            ...values.map((v) => castValue(v)),
-          ];
-        } else {
-          parsedTags[key][subkey] = [
-            parsedTags[key][subkey],
-            ...values.map((v) => castValue(v)),
-          ];
-        }
-      }
-    });
-    if (!parsedTags?.['rtt-open'])
-      return { error: "no rtt connect tag?", tags: tags };
-    return { url, ...parsedTags };
-  }
-
-  function castValue(value) {
-    // Check for boolean strings
-    if (value.toLowerCase() === "true") return true;
-    if (value.toLowerCase() === "false") return false;
-
-    // Check for IPv4 addresses or similar patterns that should not be converted
-    const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-    if (ipv4Regex.test(value)) return value;
-
-    // Additional check for geohash-like patterns (alphanumeric strings)
-    // This regex matches strings that contain both letters and numbers, indicative of a geohash
-    const geohashRegex = /^[0-9a-zA-Z]+$/;
-    if (
-      geohashRegex.test(value) &&
-      /[a-zA-Z]/.test(value) &&
-      /[0-9]/.test(value)
-    )
-      return value;
-
-    // Attempt to parse as a float
-    const asFloat = parseFloat(value);
-    if (!isNaN(asFloat) && isFinite(asFloat) && String(asFloat) === value) {
-      return asFloat;
-    }
-
-    // Return the original value if none of the above conditions are met
-    return value;
-  }
-
   onDestroy(() => {
     worker.terminate()
   });
@@ -399,7 +325,6 @@
   }
 
   function calculateDimensions(event) {
-    // Default dimension and RTT scaling factor
     const defaultDimension = 150; // Base size of the block
     const rttScalingFactor = 0.02; // Determines how much RTT affects the size
 
@@ -473,9 +398,9 @@
     }
   });
 
-  $: getMonitors = Array.from($monitors.keys())
-  $: getMonitor = (pubkey) => $monitors.get(pubkey)
-  $: getMonitorName = (pubkey) => JSON.parse(getMonitor(pubkey)?.['0']?.content)?.name
+  // $: getMonitors = Array.from($monitors.keys())
+  // $: getMonitor = (pubkey) => $monitors.get(pubkey)
+  // $: getMonitorName = (pubkey) => JSON.parse(getMonitor(pubkey)?.['0']?.content)?.name
 </script>
 
 {#if initialSyncComplete}
@@ -571,7 +496,7 @@
     </select>
   </div> -->
 {:else}
-  <div id="loadingText">found {$k30166.length} relays</div>
+  <div id="loadingText">found {$k30166.length} relays from {$monitors.length} monitors</div>
   <Loading />
 {/if}
 

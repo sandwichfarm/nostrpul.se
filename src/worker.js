@@ -3,6 +3,7 @@ import { Relay, SimplePool } from "nostr-tools";
 
 const RelayPool = new SimplePool();
 const events = new Map()
+const monitors = new Set()
 
 const BATCH_SIZE = 5
 
@@ -72,6 +73,11 @@ const seed = async (message) => {
     if (!url) {
       continue;
     }
+
+    if(!monitors.has(event.pubkey)){
+      monitors.add(event.pubkey)
+    }
+
     if (events.has(url)) {
       continue;
     }
@@ -81,18 +87,19 @@ const seed = async (message) => {
 
     if (batch.length === BATCH_SIZE) {
       console.log(`sent ${BATCH_SIZE} events`);
-      self.postMessage({ type: 'events', events: batch });
+      console.log('w: mon: ', Array.from(monitors).length)
+      self.postMessage({ type: 'events', events: batch, monitors: Array.from(monitors) });
       batch = [];
     }
   }
   
   if (batch.length > 0) {
     console.log(`sent remaining ${batch.length} events`);
-    self.postMessage({ type: 'events', events: batch });
+    self.postMessage({ type: 'events_excess', batch });
   }
 
-  console.log(`worker found ${events.size} events`);
-  self.postMessage({ type: 'eose' });
+  console.log(`worker found ${events.size} events from ${monitors.size} monitors`);
+  self.postMessage({ type: 'eose', monitors: Array.from(monitors) });
 };
 
 
