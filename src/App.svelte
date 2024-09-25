@@ -1,9 +1,11 @@
 <script>
   document.title = "nostrpul.se";
 
-  import { onMount, afterUpdate, tick } from "svelte";
+  import { onMount, onDestroy, afterUpdate, tick } from "svelte";
   import { fade } from "svelte/transition";
   import { writable } from "svelte/store";
+
+  import Loading from "./components/Loading.svelte";
 
   import Modal from "./Modal.svelte";
 
@@ -20,11 +22,19 @@
   import { generateBackground } from "./utils";
 
   // draft7 prod
-  const DEFAULT_MONITOR = "9bbbb845e5b6c831c29789900769843ab43bb5047abe697870cb50b6fc9bf923";
+  const DEFAULT_MONITOR = [
+    "9bbbb845e5b6c831c29789900769843ab43bb5047abe697870cb50b6fc9bf923",
+    "9b85d54cc4bc886d60782f80d676e41bc637ed3ecc73d2bb5aabadc499d6a340",
+    "9bb7cd94d7b688a4070205d9fb5e9cca6bd781fe7cabe780e19fdd23a036e0a1",
+    "9ba6484003e8e88600f97ebffd897b2fe82753082e8e0cd8ea19aac0ff2b712b",
+    "9ba1d7892cd057f5aca5d629a5a601f64bc3e0f1fc6ed9c939845e25d5e1e254",
+    "9bac3d58ef5a34c7c4a9b05b07c98e4afc56655542387b4d36c9d270f898592e",
+    "9ba0ce3dcc28c26da0d0d87fa460c78b602a180b61eb70b62aba04505c6331f4",
+    "9ba046db56b8e6682c48af8d6425ffe80430a3cd0854d95381af27c5d27ca0f7"
+  ];
 
-  //draft7 dev
-  // const DEFAULT_MONITOR = "472a3c602c881f871ff5034e53c8353a4a52a64dd1b7d8b7d4d8d76e0be8a244";
-    
+  const authors = DEFAULT_MONITOR
+
   const ONLINE_THRESHOLD = Math.round(Date.now() / 1000) - (60 * 60 * 6);
 
   let currentRelayModal = null;
@@ -42,8 +52,7 @@
   const monitors = writable(new Map())
   const k30166 = writable([]);
   const loading30166 = writable(false);
-  // const event30166 = writable(null);
-  let activeTab = writable(0); // Currently selected tab index
+  let activeTab = writable(0);
   let focusRelay = writable(null);
 
   let loading = true;
@@ -54,34 +63,16 @@
   const newEvents = [];
   
   let eventRunner
+    
+  import WsWorker from "./worker?worker";
 
-  // $: if ($activeTab) {
-  //   event30166.set(null);
-  //   const ev = get30166($focusRelay)
-  //     .then((ev) => {
-  //       event30166.set(ev);
-  //       loading30166.set(false);
-  //     })
-  //     .catch(console.error);
-  // }
-
-  // let currentRelayModal = null;
+  const worker = new WsWorker();
 
   function hideModals() {
     activeTab.set(0);
     focusRelay.set(null);
-    // event30166.set(null);
-    // hideGenericModal();
     hideRelayModal();
   }
-
-  // function showGenericModal(id) {
-  //   currentGenericModal = id;
-  // }
-
-  // function hideGenericModal() {
-  //   currentGenericModal = null;
-  // }
 
   function showRelayModal(ev) {
     focusRelay.set(getUrlFromEvent(ev));
@@ -156,15 +147,12 @@
             promises.push(getMonitorStuff(event.pubkey))
           },
           oneose() {
-            //console.log('done!!!')
             resolve()
           },
         }
       )
     })
-    //console.log('waiting....')
     const stuff = await Promise.allSettled(promises)
-    //console.log('allsettled')
     for(const res of stuff){
       if(res.status === 'fulfilled') {
         if(!res.value?.profile || !res.value?.relayList) continue
@@ -178,9 +166,6 @@
         })
       }
     }
-
-    //console.log('monitors synced')
-    ////console.log(Array.from($monitors.values()))
   }
 
   async function getMonitorStuff(pubkey){
@@ -198,7 +183,6 @@
         ],
         {
           onevent(event) {
-            //console.log('monitor stuff', event.id)
             if(event.kind === 0){
               profile = event
             }
@@ -207,7 +191,6 @@
             }
             if(profile && relayList) {
               sub.close()
-              //console.log('done!!! again')
               clearTimeout(to)
               resolve({profile, relayList})
             }
@@ -219,7 +202,6 @@
 
   async function changeMonitor(pubkey) {
     if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
-    ////console.log('onchange')
     $k30166 = []
     $doNotReconnect = true
     $activeSubscription.close()
@@ -230,89 +212,37 @@
   }
 
   async function initialSync() {
-    //console.log('initial sync')
     await syncMonitorData()
-    //console.log('syncMonitorData complete')
     await syncMonitorEvents()
-    //console.log('syncMonitorEvents complete')
+  }
+
+  async function bindWorker(){
+    worker.addEventListener('message', (message) => {
+      const { type } = message.data
+
+      if(type === 'event'){
+        const { event } = message.data
+        on_event_handler(event)
+      }
+      if(type === 'events'){
+        const { events } = message.data
+        for(const event of events) {
+          on_event_handler(event)
+        }
+      }
+      if(type == 'eose'){
+        processBatch()
+        continuousSync()
+      }
+    })
   }
 
   async function syncMonitorEvents(){
-    //console.log('syncing monitor events', $activeMonitor)
-    const fetcher = NostrFetcher.init();
-    const iter = fetcher.allEventsIterator(
-      relays,
-      {
-        kinds: [30166],
-        authors: [$activeMonitor],
-      },
-      { since },
-      { skipVerification: true },
-    );
-    //console.log('iterating')
-    for await (const ev of iter) {
-      //console.log(ev.id)
-      on_event_handler(ev);
-    }
+    worker.postMessage({ type: "seed", authors, relays, since })
   }
 
   const continuousSync = async () => {
-    return RelayPool.subscribeMany(
-    [...relays],
-    [
-      {
-        limit: 10000,
-        kinds: [30166],
-        authors: [$activeMonitor],
-        since,
-      }
-    ],
-    {
-      onevent(event) {
-        //console.log('event', event.id)
-        on_event_handler(event);
-      },
-      onclose() {
-        if($doNotReconnect) return
-        const reconnect = 2000;
-        ////console.log(`Subscription closed, reconnecting in ${reconnect}`);
-        setTimeout(continuousSync, reconnect);
-      },
-      oneose() {
-        ////console.log("EOSE");
-        processBatch();
-        initialSyncComplete = true;
-      },
-    },
-  )
-    // RelaySocket = await Relay.connect("wss://relaypag.es").catch(
-    //   continuousSync,
-    // );
-    // RelaySocket.subscribe(
-    //   [
-    //     {
-    //       limit: 1000,
-    //       kinds: [30166],
-    //       authors: [$activeMonitor],
-    //       since,
-    //     },
-    //   ],
-    //   {
-    //     onevent(event) {
-    //       on_event_handler(event);
-    //     },
-    //     onclose() {
-    //       const reconnect = 2000;
-    //       ////console.log(`Subscription closed, reconnecting in ${reconnect}`);
-    //       setTimeout(continuousSync, reconnect);
-    //     },
-    //     oneose() {
-    //       ////console.log("EOSE");
-    //       processBatch();
-    //       initialSyncComplete = true;
-    //     },
-    //   },
-    // );
+    worker.postMessage({ type: "sync", authors, relays, since })
   };
 
   async function get30166(relay) {
@@ -325,7 +255,7 @@
             "#d": [relay],
             limit: 1,
             kinds: [30166],
-            authors: [$activeMonitor],
+            authors: [...$activeMonitor],
             since: Math.round(Date.now() / 1000) - 60 * 60 * 2,
           },
         ],
@@ -442,10 +372,14 @@
     return value;
   }
 
+  onDestroy(() => {
+    worker.terminate()
+  });
+
   onMount(async () => {
-    await initialSync();
+    bindWorker()
+    syncMonitorEvents()
     eventRunner = setInterval( populateNextEvent, 250 )
-    $activeSubscription = await continuousSync();
     return () => {
       clearInterval(eventRunner)
       RelaySocket.close();
@@ -630,7 +564,7 @@
     </select>
   </div> -->
 {:else}
-  <div id="loading">loading</div>
+  <Loading />
 {/if}
 
 <style>
