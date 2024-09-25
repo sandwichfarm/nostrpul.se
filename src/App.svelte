@@ -226,8 +226,15 @@
       }
       if(type === 'events'){
         const { events } = message.data
+        let lastEvent = 0 
+        let timeout
         for(const event of events) {
+          clearTimeout(timeout)
           on_event_handler(event)
+          lastEvent = Date.now()
+          timeout = setTimeout( () => { 
+            processBatch()
+          }, 2000)
         }
       }
       if(type == 'eose'){
@@ -387,7 +394,7 @@
   });
 
   function processBatch() {
-    if (!initialSyncComplete) initialSyncComplete = true;
+    initialSyncComplete = true;
     k30166.update((currentk30166) => [...currentk30166]);
   }
 
@@ -564,6 +571,7 @@
     </select>
   </div> -->
 {:else}
+  <div id="loadingText">found {$k30166.length} relays</div>
   <Loading />
 {/if}
 
@@ -731,6 +739,18 @@
     font-size: 3em;
   }
 
+
+  #loadingText {
+      color:#000;
+      font-size: 3em;
+      position: fixed;
+      display:block;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
   @media (max-width: 600px) {
     #stats {
       flex-direction: column;
@@ -791,5 +811,6 @@
     .mute {
       display: none;
     }
+
   }
 </style>
