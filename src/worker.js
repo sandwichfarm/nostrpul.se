@@ -7,6 +7,10 @@ const monitors = new Set()
 
 const BATCH_SIZE = 5
 
+let isSyncing = false;
+let isSeeding = false;
+let isSeeded = false;
+
 function chunkArray(array, chunkSize) {
   if (!Array.isArray(array)) {
       throw new TypeError('First argument must be an array');
@@ -26,6 +30,10 @@ function chunkArray(array, chunkSize) {
 }
 
 const sync = async (message) => {
+  if(isSyncing){
+    return;
+  }
+  isSyncing = true;
   const { authors, since, relays } = message;
   RelayPool.subscribeMany(
     [...relays],
@@ -42,6 +50,7 @@ const sync = async (message) => {
         self.postMessage({ type: 'event', event }); 
       },
       onclose() {
+        isSyncing = false;  
         const reconnect = 2000;
         setTimeout(sync, reconnect);
       },
@@ -53,6 +62,10 @@ const sync = async (message) => {
 }
 
 const seed = async (message) => {
+  if(isSeeding || isSeeded){
+    return;
+  }
+  isSeeding = true;
   const { authors, since, relays } = message;
   const fetcher = NostrFetcher.init();
   const iter = fetcher.allEventsIterator(
@@ -100,8 +113,10 @@ const seed = async (message) => {
 
   console.log(`worker found ${events.size} events from ${monitors.size} monitors`);
   self.postMessage({ type: 'eose', monitors: Array.from(monitors) });
-};
 
+  isSeeding = false;
+  isSeeded = true;
+};
 
 self.onmessage = async (event) => {
   const { type } = event.data;
