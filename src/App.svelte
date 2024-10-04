@@ -100,11 +100,12 @@
   const updateEvents = (processedEvent) => {
     if (processedEvent) {
       k30166.update((currentk30166) => {
-        return [processedEvent, ...currentk30166]
+        const events = [processedEvent, ...currentk30166]
           .filter(
             (v, i, a) => a.findIndex((t) => t.dTag === v.dTag) === i,
           )
           .filter( ev => ev.created_at > Math.round(Date.now()/1000)-ONLINE_THRESHOLD )
+        return events
       });
     }
   };
@@ -117,12 +118,21 @@
     if(!newEvents.length) return
     const event = newEvents.shift()
     updateEvents(event);
-    processBatch();
     if (!isMuted) toneGenerator.playNextNote();
+    // processBatch();
+    
+  };
+
+  const existsAndHasBeenReported = (event) => {
+    const existing = $k30166.find((ev) => getUrlFromEvent(ev) === getUrlFromEvent(event));
+    if(!existing || !existing?.length) return false
+    if(existing.created_at > Date.now()/1000-ONLINE_THRESHOLD) return true
+    return false
   };
 
   const on_event_handler = (event) => {
-    if (initialSyncComplete && event.created_at < since) return;
+    if(existsAndHasBeenReported(event)) return
+    // if (initialSyncComplete && event.created_at < since) return;
     const processedEvent = processEvent(event);
     since = event.created_at;
     if (!initialSyncComplete) 
@@ -130,93 +140,6 @@
     else 
       queueEvent(processedEvent);
   };
-
-  // async function syncMonitorData(){
-  //   const promises = []
-  //   await new Promise( resolve => {
-  //     RelayPool.subscribeMany(
-  //       relays,
-  //       [{kinds: [10166], limit: 100}],
-  //       {
-  //         onevent(event) {
-  //           monitors.update( monitors => {
-  //             if(!event?.pubkey) return
-  //             const obj = monitors.get(event.pubkey) || {} 
-  //             obj['10166'] = event 
-  //             monitors.set(event.pubkey, obj)
-  //             return monitors
-  //           })
-  //           promises.push(getMonitorStuff(event.pubkey))
-  //         },
-  //         oneose() {
-  //           resolve()
-  //         },
-  //       }
-  //     )
-  //   })
-  //   const stuff = await Promise.allSettled(promises)
-  //   for(const res of stuff){
-  //     if(res.status === 'fulfilled') {
-  //       if(!res.value?.profile || !res.value?.relayList) continue
-  //       const {profile, relayList} = res.value
-  //       monitors.update( ms => {
-  //         const obj = ms.get(profile.pubkey) || {}
-  //         obj['0'] = profile
-  //         obj['10002'] = relayList
-  //         ms.set(profile.pubkey, obj)
-  //         return ms
-  //       })
-  //     }
-  //   }
-  // }
-
-  // async function getMonitorStuff(pubkey){
-  //   let profile
-  //   let relayList 
-  //   return new Promise( resolve => {
-  //     const to = setTimeout(() => {
-  //       //console.log('timeout')
-  //       resolve()
-  //     }, 3000)
-  //     const sub = RelayPool.subscribeMany(
-  //       ['wss://purplepag.es', 'wss://user.kindpag.es'],
-  //       [
-  //         {kinds: [0, 10002], authors: [pubkey]}
-  //       ],
-  //       {
-  //         onevent(event) {
-  //           if(event.kind === 0){
-  //             profile = event
-  //           }
-  //           if(event.kind === 10002){
-  //             relayList = event
-  //           }
-  //           if(profile && relayList) {
-  //             sub.close()
-  //             clearTimeout(to)
-  //             resolve({profile, relayList})
-  //           }
-  //         }
-  //       }
-  //     )
-  //   })
-  // }
-
-  // async function changeMonitor(pubkey) {
-  //   if(DEFAULT_MONITOR === $activeMonitor && !monitorChanged) return
-  //   $k30166 = []
-  //   $doNotReconnect = true
-  //   $activeSubscription.close()
-  //   $monitorThreshold = parseInt($monitors.get($activeMonitor)?.['10166']?.tags.find(tag => tag[0] === 'freqency')?.[1])
-  //   monitorChanged = true
-  //   $doNotReconnect = false
-  //   await syncMonitorEvents()
-  // }
-
-  // async function initialSync() {
-  //   // await syncMonitorData()
-  //   await syncMonitorEvents()
-  // }
 
   async function bindWorker(){
     worker.addEventListener('message', (message) => {
@@ -241,17 +164,21 @@
           on_event_handler(event)
           lastEvent = Date.now()
           timeout = setTimeout( () => { 
+            initialSyncComplete = true;
             processBatch()
           }, 2000)
         }
       }
       if(type === 'events_excess'){
         const { events } = message.data
+        
         for(const event of events) {
+          // console.log(event.tags.find(t => t[0] === 'd')[1])
           on_event_handler(event)
         }
       }
       if(type == 'eose'){
+        initialSyncComplete = true;
         processBatch()
         continuousSync()
       }
@@ -302,7 +229,7 @@
   }
 
   function getUrlFromEvent(event) {
-    return event.tags.filter((tag) => tag[0] == "d")?.[0]?.[1];
+    return event.tags.find((tag) => tag[0] == "d")?.[1];
   }
 
   onDestroy(() => {
@@ -320,7 +247,6 @@
   });
 
   function processBatch() {
-    initialSyncComplete = true;
     k30166.update((currentk30166) => [...currentk30166]);
   }
 

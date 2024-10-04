@@ -86,8 +86,8 @@ const seed = async (message) => {
     batch.push(event);
 
     if (batch.length === BATCH_SIZE) {
-      console.log(`sent ${BATCH_SIZE} events`);
-      console.log('w: mon: ', Array.from(monitors).length)
+      // console.log(`sent ${BATCH_SIZE} events`);
+      // console.log('w: mon: ', Array.from(monitors).length)
       self.postMessage({ type: 'events', events: batch, monitors: Array.from(monitors) });
       batch = [];
     }
@@ -95,7 +95,7 @@ const seed = async (message) => {
   
   if (batch.length > 0) {
     console.log(`sent remaining ${batch.length} events`);
-    self.postMessage({ type: 'events_excess', batch });
+    self.postMessage({ type: 'events_excess', events: batch });
   }
 
   console.log(`worker found ${events.size} events from ${monitors.size} monitors`);
