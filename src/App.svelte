@@ -160,13 +160,14 @@
         let timeout
         monitors.set(_monitors)
         for(const event of events) {
-          clearTimeout(timeout)
           on_event_handler(event)
-          lastEvent = Date.now()
-          timeout = setTimeout( () => { 
-            initialSyncComplete = true;
-            processBatch()
-          }, 2000)
+          // clearTimeout(timeout)
+          // on_event_handler(event)
+          // lastEvent = Date.now()
+          // timeout = setTimeout( () => { 
+          //   initialSyncComplete = true;
+          //   processBatch()
+          // }, 2000)
         }
       }
       if(type === 'events_excess'){

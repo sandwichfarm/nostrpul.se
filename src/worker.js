@@ -71,8 +71,7 @@ const seed = async (message) => {
   const iter = fetcher.allEventsIterator(
     relays,
     {
-      kinds: [30166],
-      authors,
+      kinds: [30166]
     },
     { since },
     { skipVerification: true },
